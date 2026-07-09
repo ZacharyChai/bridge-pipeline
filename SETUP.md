@@ -1,12 +1,10 @@
 # Local development setup
 
 The project brief is in [README.md](README.md). This file is the how-to-run for
-local dev. (M2 will make the DB reproducible via `docker compose`; until then the
-steps below stand up a local Postgres.)
+local dev.
 
 ## Prerequisites
 
-- **Python 3.11+** (this repo is developed on 3.13).
 - **Docker via Colima** (qemu backend). On an Intel Mac running macOS < 15.5 the
   default `vz` backend has broken networking, so use qemu:
 
@@ -14,6 +12,35 @@ steps below stand up a local Postgres.)
   brew install colima docker docker-compose qemu
   colima start --vm-type qemu
   ```
+- **Python 3.11+** (this repo is developed on 3.13) — only needed for the
+  local test/dev loop below, not to run the pipeline.
+
+## Run the whole thing with Docker (preferred)
+
+Reproducible from a clean clone; no local Python needed. The app reaches
+Postgres over the compose network, so no port-forward/tunnel is involved.
+
+```bash
+cp .env.example .env         # paste your FRED_API_KEY (free: see link below)
+docker compose up --build    # starts Postgres, waits for health, runs the pipeline
+```
+
+Inspect the warehouse (data persists in the `pgdata` volume):
+
+```bash
+docker compose up -d db
+docker compose exec db psql -U bridge -d bridge \
+  -c "select count(*), min(obs_date), max(obs_date) from clean_observations;"
+docker compose down          # stops containers; keeps the volume
+```
+
+Get a free FRED API key at
+https://fred.stlouisfed.org/docs/api/api_key.html
+
+## Local dev loop (tests + iterating without a rebuild)
+
+For fast TDD you can run against a local Postgres + the venv instead of rebuilding
+the image each change.
 
 ## One-time setup
 
