@@ -3,6 +3,7 @@
 Pure parsing is tested against a captured FRED payload; the HTTP call is tested
 against a fake session so no network is required.
 """
+
 from ingest.fred import fetch_observations, parse_observations
 
 # A trimmed but real-shaped FRED /series/observations payload. Note the "."
@@ -13,10 +14,30 @@ SAMPLE_PAYLOAD = {
     "observation_end": "9999-12-31",
     "count": 4,
     "observations": [
-        {"realtime_start": "2026-07-08", "realtime_end": "2026-07-08", "date": "2026-07-01", "value": "4.40"},
-        {"realtime_start": "2026-07-08", "realtime_end": "2026-07-08", "date": "2026-07-02", "value": "4.43"},
-        {"realtime_start": "2026-07-08", "realtime_end": "2026-07-08", "date": "2026-07-03", "value": "."},
-        {"realtime_start": "2026-07-08", "realtime_end": "2026-07-08", "date": "2026-07-06", "value": "4.48"},
+        {
+            "realtime_start": "2026-07-08",
+            "realtime_end": "2026-07-08",
+            "date": "2026-07-01",
+            "value": "4.40",
+        },
+        {
+            "realtime_start": "2026-07-08",
+            "realtime_end": "2026-07-08",
+            "date": "2026-07-02",
+            "value": "4.43",
+        },
+        {
+            "realtime_start": "2026-07-08",
+            "realtime_end": "2026-07-08",
+            "date": "2026-07-03",
+            "value": ".",
+        },
+        {
+            "realtime_start": "2026-07-08",
+            "realtime_end": "2026-07-08",
+            "date": "2026-07-06",
+            "value": "4.48",
+        },
     ],
 }
 

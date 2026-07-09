@@ -4,6 +4,7 @@ Skipped automatically when no Postgres is reachable, so the unit suite stays
 green anywhere (laptop, CI). Runs for real once the warehouse is up (M2),
 exercising ingest -> raw table -> transform -> clean table end to end.
 """
+
 import pytest
 
 from config import load_settings
