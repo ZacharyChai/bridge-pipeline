@@ -1,0 +1,4 @@
+# Runtime dependencies. Kept deliberately small — "nothing exotic" (see README stack).
+requests>=2.31
+psycopg[binary]>=3.1
+SQLAlchemy>=2.0
