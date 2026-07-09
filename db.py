@@ -30,8 +30,14 @@ CREATE TABLE IF NOT EXISTS clean_observations (
 """
 
 
-def make_engine(settings: Settings) -> Engine:
-    return create_engine(settings.database_url, future=True)
+def make_engine(settings: Settings, *, connect_timeout: int = 10) -> Engine:
+    # connect_timeout keeps a dead/unreachable warehouse from hanging the whole
+    # process — the pipeline (and the integration-test skip) fail fast instead.
+    return create_engine(
+        settings.database_url,
+        future=True,
+        connect_args={"connect_timeout": connect_timeout},
+    )
 
 
 def ping(engine: Engine) -> bool:
