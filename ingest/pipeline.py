@@ -4,6 +4,7 @@ Run with `python -m ingest.pipeline` (or `make run`). Reads config from the
 environment / .env. Aborts (non-zero exit) if the data-quality gate fails, so a
 bad pull never silently overwrites the clean table.
 """
+
 from __future__ import annotations
 
 import logging
