@@ -4,6 +4,7 @@ transform() is pure: raw string rows in, typed clean rows out. It drops FRED's
 "." missing markers, coerces values to float, parses dates, de-duplicates on the
 (series_id, date) primary key, and sorts chronologically.
 """
+
 import datetime as dt
 
 from transform.transform import transform
@@ -11,10 +12,10 @@ from transform.transform import transform
 RAW = [
     {"series_id": "DGS10", "date": "2026-07-02", "value": "4.43"},
     {"series_id": "DGS10", "date": "2026-07-01", "value": "4.40"},
-    {"series_id": "DGS10", "date": "2026-07-03", "value": "."},      # missing -> dropped
+    {"series_id": "DGS10", "date": "2026-07-03", "value": "."},  # missing -> dropped
     {"series_id": "DGS10", "date": "2026-07-06", "value": "4.48"},
-    {"series_id": "DGS10", "date": "2026-07-06", "value": "4.48"},   # dup PK -> collapsed
-    {"series_id": "DGS10", "date": "2026-07-07", "value": None},     # null -> dropped
+    {"series_id": "DGS10", "date": "2026-07-06", "value": "4.48"},  # dup PK -> collapsed
+    {"series_id": "DGS10", "date": "2026-07-07", "value": None},  # null -> dropped
 ]
 
 
@@ -23,8 +24,8 @@ def test_transform_drops_missing_and_nulls():
     values = [r["value"] for r in clean]
     assert None not in values
     assert all(isinstance(v, float) for v in values)
-    # 5 non-missing raw rows, one of which is a duplicate PK -> 4 unique clean rows
-    assert len(clean) == 4
+    # 4 non-missing raw rows, two of which share a PK (2026-07-06) -> 3 unique rows
+    assert len(clean) == 3
 
 
 def test_transform_types_and_sort():
