@@ -79,7 +79,7 @@ Built milestone by milestone:
 | M1 — pipeline core (TDD) | ✅ |
 | M2 — containerize (Docker + compose) | ✅ |
 | M3 — CI (GitHub Actions) | ✅ |
-| M4 — provision a Linux VPS with Terraform | planned |
+| M4 — provision a Linux VPS with Terraform | ✅ |
 | M5 — continuous delivery + cron schedule | planned |
 | M6 — monitoring + backup/restore | planned |
 

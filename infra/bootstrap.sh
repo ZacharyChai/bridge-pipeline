@@ -13,6 +13,17 @@ DEPLOY_USER="${DEPLOY_USER:-deploy}"
 
 echo "[bootstrap] starting at $(date -u)"
 
+# --- Swap: e2-micro has only 1GB RAM and no swap by default -----------------
+# A 2GB swapfile gives headroom for Postgres + Docker + the pipeline running
+# concurrently, at the cost of some disk (20GB boot disk has plenty of room).
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 # --- Non-root user with passwordless sudo -----------------------------------
 # GCP creates the user from the ssh-keys metadata; make sure it can sudo.
 if id "$DEPLOY_USER" >/dev/null 2>&1; then
