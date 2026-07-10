@@ -51,12 +51,82 @@ jobs:
       - name: Test (pytest)
         run: pytest -q
 
-  build-image:
+  build-and-push:
     # Only after tests pass, and only when landing on main.
     needs: lint-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build the pipeline image
-        run: docker build -t bridge-pipeline:${{ github.sha }} .
+
+      - name: Image name (GHCR requires lowercase)
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.img.outputs.name }}:latest
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+
+  deploy:
+    # Continuous delivery: push the new image to the live VPS over SSH.
+    # Opt-in: stays skipped (main green) until you set repo variable
+    # DEPLOY_ENABLED=true — do that after M4 is applied and the secrets are set:
+    #   gh variable set DEPLOY_ENABLED --body true
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Render .env and copy deploy files
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          umask 077
+          {
+            echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+            echo "FRED_API_KEY=${FRED_API_KEY}"
+            echo "FRED_SERIES_ID=DGS10"
+            echo "POSTGRES_DB=bridge"
+            echo "POSTGRES_USER=bridge"
+            echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+          } > prod.env
+          scp -i ~/.ssh/id_deploy \
+            deploy/docker-compose.prod.yml deploy/remote-deploy.sh deploy/bridge-pipeline.cron prod.env \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/"
+
+      - name: Run remote deploy
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "GHCR_USER='${GHCR_USER}' GHCR_TOKEN='${GHCR_TOKEN}' bash /tmp/remote-deploy.sh"

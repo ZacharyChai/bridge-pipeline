@@ -53,5 +53,11 @@ variable "ssh_pubkey_path" {
 
 variable "ssh_source_ranges" {
   type        = list(string)
-  description = "CIDRs allowed to reach SSH. Required — set to YOUR_IP/32, not 0.0.0.0/0. Find your IP with: curl ifconfig.me"
+  description = "CIDRs allowed to reach SSH. Required — set to YOUR_IP/32, not 0.0.0.0/0. Find your IP with: curl ifconfig.me. Include the GitHub Actions egress range or use a broad range only while deploying."
+}
+
+variable "deploy_pubkey" {
+  type        = string
+  description = "Optional second public key (as a string) for the CI deploy user, so GitHub Actions can SSH in. Its private key goes in the DEPLOY_SSH_KEY GitHub secret."
+  default     = ""
 }

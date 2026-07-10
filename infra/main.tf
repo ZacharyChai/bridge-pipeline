@@ -40,8 +40,12 @@ resource "google_compute_instance" "vm" {
   }
 
   metadata = {
-    # Key-only login for the non-root user; disable OS Login so this key is used.
-    ssh-keys       = "${var.ssh_user}:${trimspace(file(pathexpand(var.ssh_pubkey_path)))}"
+    # Key-only login for the non-root user; disable OS Login so these keys are used.
+    # Includes your personal key plus (optionally) the CI deploy key.
+    ssh-keys = join("\n", compact([
+      "${var.ssh_user}:${trimspace(file(pathexpand(var.ssh_pubkey_path)))}",
+      var.deploy_pubkey != "" ? "${var.ssh_user}:${trimspace(var.deploy_pubkey)}" : "",
+    ]))
     enable-oslogin = "FALSE"
     # Read by bootstrap.sh so the hardened user matches var.ssh_user.
     deploy-user = var.ssh_user

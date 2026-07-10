@@ -1,0 +1,40 @@
+# Production stack on the VPS. Postgres runs continuously (the warehouse is the
+# deliverable); the pipeline is a batch job the cron invokes with
+# `--profile batch run`, so a plain `up -d` starts only the database.
+#
+# All values come from /opt/bridge/.env, written by the deploy job from GitHub
+# secrets.
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bridge}
+      POSTGRES_USER: ${POSTGRES_USER:-bridge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bridge} -d ${POSTGRES_DB:-bridge}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pipeline:
+    image: ${IMAGE:?set IMAGE in .env}
+    profiles: ["batch"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FRED_API_KEY: ${FRED_API_KEY:?set FRED_API_KEY in .env}
+      FRED_SERIES_ID: ${FRED_SERIES_ID:-DGS10}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-bridge}
+      POSTGRES_USER: ${POSTGRES_USER:-bridge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+
+volumes:
+  pgdata:
