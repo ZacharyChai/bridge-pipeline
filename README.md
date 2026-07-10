@@ -80,7 +80,7 @@ Built milestone by milestone:
 | M2 — containerize (Docker + compose) | ✅ |
 | M3 — CI (GitHub Actions) | ✅ |
 | M4 — provision a Linux VPS with Terraform | ✅ |
-| M5 — continuous delivery + cron schedule | planned |
+| M5 — continuous delivery + cron schedule | ✅ |
 | M6 — monitoring + backup/restore | planned |
 
 ## Repository layout
