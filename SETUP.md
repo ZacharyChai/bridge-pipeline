@@ -1,7 +1,7 @@
 # Local development setup
 
-The project brief is in [README.md](README.md). This file is the how-to-run for
-local dev.
+See [README.md](README.md) for the project overview. This file is the
+how-to-run for local dev.
 
 ## Prerequisites
 
