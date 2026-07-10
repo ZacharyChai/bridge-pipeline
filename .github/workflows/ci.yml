@@ -107,6 +107,10 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          # Optional (M6): set once the Uptime Kuma push monitor exists (it's
+          # created by hand in Kuma's UI, which has no config API). Until then
+          # this is empty and run-pipeline.sh silently skips the heartbeat.
+          UPTIME_KUMA_PUSH_URL: ${{ secrets.UPTIME_KUMA_PUSH_URL }}
         run: |
           umask 077
           {
@@ -116,9 +120,11 @@ jobs:
             echo "POSTGRES_DB=bridge"
             echo "POSTGRES_USER=bridge"
             echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+            echo "UPTIME_KUMA_PUSH_URL=${UPTIME_KUMA_PUSH_URL}"
           } > prod.env
           scp -i ~/.ssh/id_deploy \
-            deploy/docker-compose.prod.yml deploy/remote-deploy.sh deploy/bridge-pipeline.cron prod.env \
+            deploy/docker-compose.prod.yml deploy/remote-deploy.sh deploy/bridge-pipeline.cron \
+            deploy/run-pipeline.sh deploy/backup.sh prod.env \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/"
 
       - name: Run remote deploy

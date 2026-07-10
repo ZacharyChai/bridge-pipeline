@@ -66,3 +66,48 @@ tail -n 40 /opt/bridge/pipeline.log    # cron run output
 > widen `ssh_source_ranges` to allow GitHub Actions egress, or run deploys from a
 > self-hosted runner / temporarily open SSH. For a private hobby box the simplest
 > path is a broad SSH range guarded by key-only auth.
+
+## Monitoring + backup (M6)
+
+**Uptime Kuma** runs as a container in `docker-compose.prod.yml`, bound to
+`127.0.0.1:3001` only — never exposed to the internet. Reach its dashboard via
+an SSH tunnel:
+
+```bash
+ssh -L 3001:localhost:3001 deploy@<ip>
+# then open http://localhost:3001 in a browser
+```
+
+One-time setup (Kuma has no config API, so this is done by hand in the UI):
+
+1. First visit creates the admin account — choose your own username/password.
+2. Add a **Postgres** monitor: hostname `db`, port `5432`, database `bridge`,
+   user `bridge` (password from the `POSTGRES_PASSWORD` secret) — polls the
+   warehouse directly.
+3. Add a **Push** monitor (type "Push"), heartbeat interval ~26h (a bit more
+   than the 24h cron cycle, so a single late run doesn't false-alarm). Copy the
+   push URL it generates.
+4. `gh secret set UPTIME_KUMA_PUSH_URL --body '<the push URL>'` — the next
+   deploy (or the next `run-pipeline.sh` cron run) starts pinging it. Until
+   this secret exists, `run-pipeline.sh` silently skips the ping.
+
+**Backups**: `backup.sh` runs daily at 05:30 UTC (before the pipeline run),
+`pg_dump`s the warehouse, gzips it to `/opt/bridge/backups/`, and prunes
+anything older than 14 days.
+
+**Restore** (documented and exercised once, not just written):
+
+```bash
+ssh deploy@<ip>
+cd /opt/bridge
+LATEST=$(ls -t backups/*.sql.gz | head -1)
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U bridge -c "CREATE DATABASE restore_test;"
+gunzip -c "$LATEST" | docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U bridge -d restore_test
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U bridge -d restore_test -c "select count(*) from clean_observations;"
+# compare against the live count, then clean up:
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U bridge -c "DROP DATABASE restore_test;"
+```

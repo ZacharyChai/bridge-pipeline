@@ -1,7 +1,11 @@
-# Bridge pipeline — daily FRED pull. Installed to /etc/cron.d/bridge-pipeline.
+# Bridge pipeline — daily jobs. Installed to /etc/cron.d/bridge-pipeline.
 # cron.d format includes the user field (deploy). deploy is in the docker group.
 SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
 
-# 06:30 UTC daily — after FRED's overnight update on business days.
-30 6 * * * deploy cd /opt/bridge && docker compose -f docker-compose.prod.yml --profile batch run --rm pipeline >> /opt/bridge/pipeline.log 2>&1
+# 05:30 UTC — pg_dump backup, before the day's pipeline run touches the data.
+30 5 * * * deploy /opt/bridge/backup.sh >> /opt/bridge/backup.log 2>&1
+
+# 06:30 UTC — FRED pull (after FRED's overnight update on business days),
+# with an Uptime Kuma heartbeat ping on completion (see run-pipeline.sh).
+30 6 * * * deploy /opt/bridge/run-pipeline.sh >> /opt/bridge/pipeline.log 2>&1

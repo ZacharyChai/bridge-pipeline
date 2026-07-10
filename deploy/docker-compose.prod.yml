@@ -36,5 +36,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-bridge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
 
+  # M6: uptime monitor. Two monitors configured by hand in its UI (a "Postgres"
+  # monitor pointed at db:5432, and a "Push" monitor the pipeline pings on each
+  # run) — Kuma has no declarative-config API, so this is a one-time manual step.
+  # Bound to 127.0.0.1 only: reach the dashboard via an SSH tunnel
+  # (ssh -L 3001:localhost:3001 deploy@<host>), never exposed to the internet.
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    volumes:
+      - kuma-data:/app/data
+    ports:
+      - "127.0.0.1:3001:3001"
+
 volumes:
   pgdata:
+  kuma-data:
