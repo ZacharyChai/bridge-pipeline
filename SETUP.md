@@ -68,6 +68,20 @@ docker exec bridge-pg psql -U bridge -d bridge \
   -c "select count(*), min(obs_date), max(obs_date) from clean_observations;"
 ```
 
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+- **On every PR:** `ruff check` + `ruff format --check`, then the full `pytest`
+  suite against a Postgres **service container** (so the integration test runs,
+  not just skips). A failing test turns the `lint-and-test` check red.
+- **On merge to `main`:** builds the Docker image, gated behind passing tests.
+
+Note: this repo is private on the Free plan, where GitHub does not allow a
+required-check rule to *hard-block* the merge button (that needs GitHub Pro or a
+public repo). The red check is therefore advisory — CI still catches the failure
+and marks the PR failing; making the repo public would enable enforced blocking.
+
 ## Note on the DB tunnel (this machine only)
 
 Colima's automatic host port-forward is broken on this Intel/macOS-14 host, so
