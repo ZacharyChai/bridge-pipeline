@@ -81,7 +81,7 @@ Built milestone by milestone:
 | M3 — CI (GitHub Actions) | ✅ |
 | M4 — provision a Linux VPS with Terraform | ✅ |
 | M5 — continuous delivery + cron schedule | ✅ |
-| M6 — monitoring + backup/restore | planned |
+| M6 — monitoring + backup/restore | ✅ |
 
 ## Repository layout
 
