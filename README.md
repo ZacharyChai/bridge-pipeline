@@ -34,7 +34,7 @@ FRED API  ->  Python ingest  ->  raw_observations (Postgres)
 ## Stack
 
 Python 3.13 · Postgres 16 · Docker + docker-compose · pytest · ruff ·
-GitHub Actions. Terraform + cron + monitoring are planned (see status below).
+GitHub Actions · Terraform · cron · Uptime Kuma.
 
 ## Quickstart
 
@@ -69,6 +69,25 @@ each data-quality check. On every pull request, GitHub Actions runs ruff and the
 full pytest suite against a Postgres service container; on merge to `main` it
 builds the Docker image. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
+## Infrastructure & operations
+
+Beyond the pipeline logic, this runs as real, unattended infrastructure:
+
+- **Provisioning** ([`infra/`](infra/)) — Terraform stands up a hardened Linux VM
+  (SSH-only firewall, key-only auth, non-root deploy user, Docker installed via
+  a bootstrap script).
+- **Continuous delivery** ([`deploy/`](deploy/)) — every merge to `main` builds
+  the image, pushes it to GHCR, and deploys it to the live box over SSH.
+- **Scheduling** — a daily cron job pulls fresh data and reloads the warehouse
+  with no manual intervention.
+- **Monitoring** — Uptime Kuma watches the warehouse and receives a heartbeat
+  from every pipeline run.
+- **Backup & restore** — a nightly `pg_dump` with retention; the restore path
+  is documented and has been exercised against a live backup.
+
+Full runbooks: [`infra/README.md`](infra/README.md) ·
+[`deploy/README.md`](deploy/README.md).
+
 ## Project status
 
 Built milestone by milestone:
@@ -86,12 +105,16 @@ Built milestone by milestone:
 ## Repository layout
 
 ```
-ingest/        FRED ingest + pipeline entry point (python -m ingest.pipeline)
-transform/     pure transform + data-quality checks
-db.py          warehouse schema, upserts, reads
-config.py      typed settings from env / .env
-tests/         pytest suite (unit + integration)
-infra/         Terraform (M4)
-scripts/       local-dev helpers
-.github/       CI workflow
+ingest/                    FRED ingest + pipeline entry point (python -m ingest.pipeline)
+transform/                 pure transform + data-quality checks
+db.py                      warehouse schema, upserts, reads
+config.py                  typed settings from env / .env
+tests/                     pytest suite (unit + integration)
+infra/                     Terraform: VM provisioning + hardening
+deploy/                    CD scripts, prod compose, cron, backup
+scripts/                   local-dev helpers
+.github/                   CI/CD workflow
+Dockerfile, docker-compose.yml   local dev image + stack
+Makefile                   common tasks (test, run, lint, db-up/down)
+SETUP.md                   local-dev setup walkthrough
 ```
