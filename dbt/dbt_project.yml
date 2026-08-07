@@ -1,0 +1,48 @@
+name: "bridge_pipeline"
+version: "1.0.0"
+config-version: 2
+
+profile: "bridge_pipeline"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  bridge_pipeline:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table
+
+# Lands in a literal `raw`/`marts` schema on whichever target runs `dbt seed` (see
+# macros/generate_schema_name.sql — without that override this would default to
+# `<target_schema>_raw`).
+#
+# series_metadata/observations are enabled ONLY on duckdb. They're a DuckDB-only stand-in for
+# Snowflake's real RAW schema, which ingest/pipeline_snowflake.py populates directly with full
+# history. This is a hard guard, not just a convention to remember: an unscoped `dbt build`
+# against Snowflake runs every enabled seed, and `dbt seed` is a full truncate-and-reload, not a
+# merge — running it against Snowflake would silently overwrite the real 100K+ row production
+# RAW tables with this trimmed ~4-year fixture. Happened once during Phase 4 development; see
+# DECISIONS.md. Restored from a fresh `ingest.pipeline_snowflake` run; this +enabled guard is
+# the actual fix.
+seeds:
+  bridge_pipeline:
+    +schema: raw
+    series_metadata:
+      +enabled: "{{ target.name == 'duckdb' }}"
+    observations:
+      +enabled: "{{ target.name == 'duckdb' }}"
+    dim_series_category:
+      +schema: marts # this one IS real on every target — a business classification dim_series
+      # consumes directly (Phase 4), not raw ingested data. Runs the same on duckdb and snowflake.
