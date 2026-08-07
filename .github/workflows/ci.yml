@@ -51,6 +51,99 @@ jobs:
       - name: Test (pytest)
         run: pytest -q
 
+      - name: dbt deps (for sqlfluff's dbt templater)
+        run: dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: Lint (sqlfluff)
+        # dbt/.sqlfluff pins target: duckdb, so this needs no Snowflake credentials — it
+        # only compiles Jinja to check SQL style, doesn't touch real data.
+        run: |
+          cd dbt
+          sqlfluff lint models/ tests/
+
+  dbt-build:
+    # Builds staging + marts into an isolated, per-run Snowflake schema, reading real data
+    # from the production RAW schema (populated separately by ingest/pipeline_snowflake.py —
+    # this job never ingests). Torn down afterward regardless of outcome. Runs after
+    # lint-and-test passes, not in parallel — no reason to spend Snowflake credits on a
+    # build that's already known-broken by a lint or unit-test failure.
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_SCHEMA: CI_${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: dbt deps
+        run: dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: dbt build (isolated schema, target=snowflake)
+        run: dbt build --project-dir dbt --profiles-dir dbt --target snowflake
+
+      - name: dbt source freshness
+        run: dbt source freshness --project-dir dbt --profiles-dir dbt --target snowflake
+        continue-on-error: true # freshness is informational here — see DECISIONS.md's warn_after/error_after config
+
+      - name: Tear down CI schema
+        if: always() # cleanup must run even if the build/tests above failed
+        run: >
+          dbt run-operation drop_ci_schema
+          --args "{schema_name: ${{ env.SNOWFLAKE_SCHEMA }}}"
+          --project-dir dbt --profiles-dir dbt --target snowflake
+
+  publish-docs:
+    # dbt docs, built against the duckdb target (self-contained, no Snowflake credentials
+    # needed just to generate documentation HTML) and published to GitHub Pages. Only on
+    # merge to main — a PR's docs aren't the canonical published set.
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: dbt deps
+        run: dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: Seed + build (duckdb — self-contained, just to populate docs' catalog metadata)
+        run: |
+          dbt seed --project-dir dbt --profiles-dir dbt --target duckdb
+          dbt build --project-dir dbt --profiles-dir dbt --target duckdb
+
+      - name: dbt docs generate
+        run: dbt docs generate --project-dir dbt --profiles-dir dbt --target duckdb
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dbt/target
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
+
   build-and-push:
     # Only after tests pass, and only when landing on main.
     needs: lint-and-test

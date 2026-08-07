@@ -1,0 +1,18 @@
+series_id,title,frequency,units,seasonal_adjustment,observation_start,observation_end,fetched_at
+DGS3MO,"Market Yield on U.S. Treasury Securities at 3-Month Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1981-09-01,2026-08-03,2026-08-05T08:58:54.488904+00:00
+DGS1,"Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1962-01-02,2026-08-03,2026-08-05T08:58:54.488904+00:00
+DGS2,"Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1976-06-01,2026-08-03,2026-08-05T08:58:54.488904+00:00
+DGS5,"Market Yield on U.S. Treasury Securities at 5-Year Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1962-01-02,2026-08-03,2026-08-05T08:58:54.488904+00:00
+DGS10,"Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1962-01-02,2026-08-03,2026-08-05T08:58:54.488904+00:00
+DGS30,"Market Yield on U.S. Treasury Securities at 30-Year Constant Maturity, Quoted on an Investment Basis",D,%,NSA,1977-02-15,2026-08-03,2026-08-05T08:58:54.488904+00:00
+SOFR,Secured Overnight Financing Rate,D,%,NSA,2018-04-03,2026-08-03,2026-08-05T08:58:54.488904+00:00
+CPIAUCSL,Consumer Price Index for All Urban Consumers: All Items in U.S. City Average,M,Index 1982-1984=100,SA,1947-01-01,2026-06-01,2026-08-05T08:58:54.488904+00:00
+CPILFESL,Consumer Price Index for All Urban Consumers: All Items Less Food and Energy in U.S. City Average,M,Index 1982-1984=100,SA,1957-01-01,2026-06-01,2026-08-05T08:58:54.488904+00:00
+UNRATE,Unemployment Rate,M,%,SA,1948-01-01,2026-06-01,2026-08-05T08:58:54.488904+00:00
+PAYEMS,"All Employees, Total Nonfarm",M,Thous. of Persons,SA,1939-01-01,2026-06-01,2026-08-05T08:58:54.488904+00:00
+COMREPUSQ159N,Commercial Real Estate Prices for United States,Q,% Chg. from Yr. Ago,NSA,2005-01-01,2025-04-01,2026-08-05T08:58:54.488904+00:00
+SUBLPDRCSC,Net Percentage of Domestic Banks Tightening Standards for Commercial Real Estate Loans With Construction and Land Development Purposes,Q,%,NSA,2013-10-01,2026-07-01,2026-08-05T08:58:54.488904+00:00
+SUBLPDRCSN,Net Percentage of Domestic Banks Tightening Standards for Commercial Real Estate Loans Secured by Nonfarm Nonresidential Structures,Q,%,NSA,2013-10-01,2026-07-01,2026-08-05T08:58:54.488904+00:00
+SUBLPDRCSM,Net Percentage of Domestic Banks Tightening Standards for Commercial Real Estate Loans Secured by Multifamily Residential Structures,Q,%,NSA,2013-10-01,2026-07-01,2026-08-05T08:58:54.488904+00:00
+DRCRELEXFACBS,"Delinquency Rate on Commercial Real Estate Loans (Excluding Farmland), Booked in Domestic Offices, All Commercial Banks",Q,%,SA,1991-01-01,2026-01-01,2026-08-05T08:58:54.488904+00:00
+DRCRELEXFT100S,"Delinquency Rate on Commercial Real Estate Loans (Excluding Farmland), Booked in Domestic Offices, Banks Ranked 1st to 100th Largest in Size by Assets",Q,%,SA,1991-01-01,2026-01-01,2026-08-05T08:58:54.488904+00:00
