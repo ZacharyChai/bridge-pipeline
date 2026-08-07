@@ -1,0 +1,370 @@
+version: 2
+
+models:
+  - name: dim_series
+    description: One row per FRED series. Grain is `series_id`.
+    columns:
+      - name: series_key
+        description: Surrogate key, `generate_surrogate_key(series_id)`. Use this to join, not series_id.
+        tests:
+          - not_null
+          - unique
+      - name: series_id
+        description: FRED's own series identifier, e.g. DGS10. Natural key.
+        tests:
+          - not_null
+          - unique
+      - name: title
+        description: Series title as published by FRED.
+      - name: frequency
+        description: FRED's short frequency code (D, M, Q, ...).
+      - name: units
+        description: Units of the published value, as FRED describes them.
+      - name: seasonal_adjustment
+        description: FRED's seasonal adjustment short code (SA, NSA).
+      - name: observation_start_date
+        description: Earliest observation date FRED has ever published for this series.
+      - name: observation_end_date
+        description: Most recent observation date FRED had published as of the last pull.
+      - name: category
+        description: >
+          CRE-relevant classification this project assigns (rates, inflation, labor, property,
+          credit_conditions) — from the dim_series_category seed, not a FRED field. Deliberately
+          a separate scheme from ingest/series.py's `group`, which classifies for ingestion
+          strategy (vintage-tracked or not), a different axis — see DECISIONS.md.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["rates", "inflation", "labor", "property", "credit_conditions"]
+
+  - name: dim_date
+    description: One row per calendar day, 1939-01-01 through 2030-12-31. Grain is `date_day`.
+    columns:
+      - name: date_key
+        description: Surrogate key, `generate_surrogate_key(date_day)`. Use this to join, not date_day.
+        tests:
+          - not_null
+          - unique
+      - name: date_day
+        description: The calendar date. Natural key.
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: Calendar year.
+      - name: quarter
+        description: Calendar quarter (1-4).
+      - name: month
+        description: Calendar month (1-12).
+      - name: day
+        description: Day of month.
+      - name: day_of_week
+        description: 0 = Sunday through 6 = Saturday.
+      - name: fiscal_year
+        description: Equal to `year` — no fiscal-year convention was specified for this domain, so fiscal follows calendar. See DECISIONS.md.
+      - name: fiscal_quarter
+        description: Equal to `quarter`, same reasoning as fiscal_year.
+      - name: is_month_end
+        description: True if this date is the last day of its calendar month.
+      - name: is_quarter_end
+        description: True if this date is the last day of its calendar quarter.
+      - name: is_business_day
+        description: True Monday-Friday. Does not account for federal holidays — see DECISIONS.md.
+
+  - name: fct_observations
+    description: >
+      The base observation fact, full ALFRED revision history. Grain: one row per series, per
+      observation date, per vintage — (series_key, date_key, realtime_start_date). Every
+      revision is its own row; nothing is collapsed. fct_observations_latest and
+      fct_observations_point_in_time are both derived views over this table, not separate
+      ingests.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+            - series_key
+            - date_key
+            - realtime_start_date
+    columns:
+      - name: series_key
+        description: Foreign key to dim_series.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_series")
+                field: series_key
+      - name: date_key
+        description: Foreign key to dim_date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_date")
+                field: date_key
+      - name: realtime_start_date
+        description: >
+          First date this specific vintage of the value was known to be current. Part of the
+          grain — immutable per vintage once published (see DECISIONS.md's Phase 2 entry).
+        tests:
+          - not_null
+      - name: realtime_end_date
+        description: Last date this vintage was current, or 9999-12-31 if still current (true vintage-tracked series) or the pull date (current-value-only series — see DECISIONS.md).
+        tests:
+          - not_null
+      - name: value
+        description: The observed value, cast to a number. Null where FRED's source value was "." (missing) or otherwise unparseable.
+      - name: fetched_at
+        description: When the underlying raw row was landed.
+
+  - name: fct_observations_latest
+    description: >
+      Grain: one row per series, per observation date — the single most recently known vintage
+      per (series_key, date_key). "Today's best-known view of history." See
+      fct_observations_point_in_time for "what was known as of an arbitrary past date" instead.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+            - series_key
+            - date_key
+    columns:
+      - name: series_key
+        description: Foreign key to dim_series.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_series")
+                field: series_key
+      - name: date_key
+        description: Foreign key to dim_date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_date")
+                field: date_key
+      - name: realtime_start_date
+        description: The realtime_start_date of the vintage selected as "latest" for this (series, date).
+      - name: realtime_end_date
+        description: The corresponding realtime_end_date of that same vintage.
+      - name: value
+        description: The observed value, cast to a number.
+      - name: fetched_at
+        description: When the underlying raw row was landed.
+
+  - name: fct_observations_point_in_time
+    description: >
+      Grain: one row per series, per observation date, as known on the as_of_date this model
+      was built with (dbt var `as_of_date`, defaults to today — see the model file). A view,
+      not a table, because its answer is only valid for the as_of_date it was last built with.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+            - series_key
+            - date_key
+    columns:
+      - name: series_key
+        description: Foreign key to dim_series.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_series")
+                field: series_key
+      - name: date_key
+        description: Foreign key to dim_date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref("dim_date")
+                field: date_key
+      - name: realtime_start_date
+        description: The realtime_start_date of the vintage that was active as of as_of_date.
+      - name: realtime_end_date
+        description: The corresponding realtime_end_date of that same vintage.
+      - name: value
+        description: The value as it was known as of as_of_date.
+      - name: fetched_at
+        description: When the underlying raw row was landed.
+
+  - name: mart_cre_macro_conditions
+    description: >
+      The headline consumption table: one row per calendar month, combining the Treasury
+      curve, inflation, labor, commercial property prices, and bank lending standards, plus
+      derived measures. Built from fct_observations_latest — "what do we know now", not a
+      point-in-time snapshot. Starts 2015-01; see DECISIONS.md for range, forward-fill, and
+      derived-measure rationale (especially the z-score window).
+    columns:
+      - name: month_date
+        description: First day of the calendar month. Grain column.
+        tests:
+          - not_null
+          - unique
+      - name: treasury_3mo_pct
+        description: DGS3MO, month-end snapshot.
+        tests: &rate_range
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -1
+                max_value: 25
+              config:
+                severity: warn
+      - name: treasury_1y_pct
+        description: DGS1, month-end snapshot.
+        tests: *rate_range
+      - name: treasury_2y_pct
+        description: DGS2, month-end snapshot.
+        tests: *rate_range
+      - name: treasury_5y_pct
+        description: DGS5, month-end snapshot.
+        tests: *rate_range
+      - name: treasury_10y_pct
+        description: DGS10, month-end snapshot.
+        tests: *rate_range
+      - name: treasury_30y_pct
+        description: DGS30, month-end snapshot.
+        tests: *rate_range
+      - name: sofr_pct
+        description: SOFR, month-end snapshot. Null before 2018-04 (series doesn't exist yet) — expected.
+        tests: *rate_range
+      - name: cpi_index
+        description: CPIAUCSL, the month's own published reading.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 1000
+                strictly: true
+              # error, not warn: an index level can never be zero or negative -- this
+              # would mean a parsing bug, not an unusual economic reading.
+      - name: core_cpi_index
+        description: CPILFESL, the month's own published reading.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 1000
+                strictly: true
+      - name: unemployment_rate_pct
+        description: UNRATE, the month's own published reading.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+              # error: a rate cannot be negative or exceed 100% by definition -- the
+              # spec's own example of an obviously-broken value.
+      - name: nonfarm_payrolls_thousands
+        description: PAYEMS, the month's own published reading.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 500000
+                strictly: true
+      - name: cre_price_index_yoy_pct
+        description: COMREPUSQ159N (quarterly), forward-filled across the two non-print months of each quarter.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -50
+                max_value: 50
+              config:
+                severity: warn
+      - name: sloos_cre_construction_tightening_pct
+        description: SUBLPDRCSC (quarterly SLOOS), forward-filled.
+        tests: &net_pct_range
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -100
+                max_value: 100
+              # error: SLOOS reports a net percentage of banks -- bounded at +/-100% by
+              # definition, not just by historical experience.
+      - name: sloos_cre_nonresidential_tightening_pct
+        description: SUBLPDRCSN (quarterly SLOOS), forward-filled.
+        tests: *net_pct_range
+      - name: sloos_cre_multifamily_tightening_pct
+        description: SUBLPDRCSM (quarterly SLOOS), forward-filled.
+        tests: *net_pct_range
+      - name: cre_delinquency_all_banks_pct
+        description: DRCRELEXFACBS (quarterly), forward-filled.
+        tests: &delinquency_range
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+              # error: a delinquency rate is a percentage of a loan book -- bounded 0-100
+              # by definition.
+      - name: cre_delinquency_top100_banks_pct
+        description: DRCRELEXFT100S (quarterly), forward-filled.
+        tests: *delinquency_range
+      - name: treasury_10y_2y_spread_pct
+        description: treasury_10y_pct minus treasury_2y_pct. Negative means an inverted curve.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -5
+                max_value: 10
+              config:
+                severity: warn
+      - name: cpi_yoy_pct
+        description: 12-month percent change in cpi_index — the standard headline inflation rate. Null for the first 12 months of the mart's history (no prior-year value to compare against).
+        tests: &yoy_inflation_range
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -5
+                max_value: 20
+              config:
+                severity: warn
+      - name: core_cpi_yoy_pct
+        description: 12-month percent change in core_cpi_index. Same 12-month-lookback null pattern as cpi_yoy_pct.
+        tests: *yoy_inflation_range
+      - name: unemployment_rate_yoy_change_pct
+        description: 12-month change in unemployment_rate_pct, in percentage points (it's already a rate, so this is a level difference, not a percent-of-percent).
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -10
+                max_value: 10
+              config:
+                severity: warn
+      - name: nonfarm_payrolls_yoy_change_thousands
+        description: 12-month change in nonfarm_payrolls_thousands, in thousands of jobs.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -25000
+                max_value: 10000
+              # bounds sized to include the real 2020 COVID job-loss shock (~-20M) without
+              # tripping on it -- see DECISIONS.md.
+              config:
+                severity: warn
+      - name: real_10y_rate_pct
+        description: >
+          treasury_10y_pct minus cpi_yoy_pct — a realized-inflation proxy for the real 10-year
+          rate, not a TIPS-based real yield (no TIPS series in the catalog). See DECISIONS.md.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -10
+                max_value: 15
+              config:
+                severity: warn
+      - name: treasury_10y_2y_spread_zscore_60mo
+        description: >
+          Z-score of treasury_10y_2y_spread_pct against its own trailing 60-month mean/stddev.
+          Null until 60 months of mart history accumulate — on the duckdb target (seed trimmed
+          to ~4 years) this column is null for the entire fixture, which is expected, not a
+          bug. See DECISIONS.md for why 60 months and why this measure specifically.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -6
+                max_value: 6
+                row_condition: "treasury_10y_2y_spread_zscore_60mo is not null"
+              config:
+                severity: warn

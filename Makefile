@@ -1,10 +1,23 @@
 # Bridge Project — task runner.
 # Targets fill in as milestones land; each target notes the milestone that implements it.
 
-.PHONY: help install test lint fmt run up down deploy db-up db-down
+.PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix
 
 # Prefer the project venv if it exists, so targets never fall back to system Python.
 PYTHON := $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
+DBT := $(shell [ -x .venv/bin/dbt ] && echo .venv/bin/dbt || echo dbt)
+SQLFLUFF := $(shell [ -x .venv/bin/sqlfluff ] && echo .venv/bin/sqlfluff || echo sqlfluff)
+# TARGET=snowflake on the command line (e.g. `make dbt-debug TARGET=snowflake`) overrides
+# .env's DBT_TARGET default -- a plain shell env override wouldn't win, since sourcing .env
+# below unconditionally reassigns DBT_TARGET from the file. dbt's own --target flag always
+# wins over profiles.yml's env_var() default, so that's the one override path that's reliable.
+TARGET ?=
+DBT_FLAGS := --project-dir dbt --profiles-dir dbt $(if $(TARGET),--target $(TARGET),)
+
+# dbt and sqlfluff (via its dbt templater) read connection info from real shell env vars via
+# profiles.yml's env_var() -- unlike the Python pipeline, dbt does NOT load .env itself. Every
+# dbt-invoking target below sources .env first so SNOWFLAKE_* etc. are actually present.
+LOAD_ENV := set -a; [ -f .env ] && . ./.env; set +a;
 
 help:              ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -22,8 +35,11 @@ lint:              ## Lint with ruff (M3)
 fmt:               ## Auto-format with ruff (M3)
 	$(PYTHON) -m ruff format .
 
-run:               ## Run the pipeline locally (M1: ingest -> raw -> transform -> clean)
+run:               ## Run the legacy single-series pipeline (M1: ingest -> raw -> transform -> clean, Postgres)
 	$(PYTHON) -m ingest.pipeline
+
+run-snowflake:     ## Run the Phase 2 pipeline (multi-series ALFRED ingest -> Snowflake RAW)
+	$(PYTHON) -m ingest.pipeline_snowflake
 
 db-up:             ## Local dev DB: start the Postgres container + SSH tunnel (this machine)
 	docker start bridge-pg 2>/dev/null || docker run -d --name bridge-pg --restart unless-stopped \
@@ -43,3 +59,22 @@ down:              ## Tear down the Docker stack (M2)
 deploy:            ## Deploy to the live VPS (M5)
 	@echo "deploy is implemented in M5 (SSH deploy to the Terraform-provisioned box)."
 	@exit 1
+
+dbt-debug:         ## Check dbt can connect (duckdb by default; TARGET=snowflake to override)
+	$(LOAD_ENV) $(DBT) debug $(DBT_FLAGS)
+
+dbt-seed:          ## Load dbt/seeds/*.csv into RAW (duckdb only -- Snowflake RAW is populated by ingest.pipeline_snowflake, not seeded)
+	$(LOAD_ENV) $(DBT) seed $(DBT_FLAGS)
+
+dbt-build: dbt-seed ## Run + test every dbt model (duckdb by default; TARGET=snowflake to override)
+	$(LOAD_ENV) $(DBT) build $(DBT_FLAGS)
+
+dbt-docs:          ## Generate and serve dbt docs locally
+	$(LOAD_ENV) $(DBT) docs generate $(DBT_FLAGS)
+	$(LOAD_ENV) $(DBT) docs serve $(DBT_FLAGS)
+
+sqlfluff-lint:     ## Lint dbt models + singular tests (Snowflake dialect, see dbt/.sqlfluff)
+	$(LOAD_ENV) cd dbt && ../$(SQLFLUFF) lint models/ tests/
+
+sqlfluff-fix:      ## Auto-fix what sqlfluff can
+	$(LOAD_ENV) cd dbt && ../$(SQLFLUFF) fix models/ tests/

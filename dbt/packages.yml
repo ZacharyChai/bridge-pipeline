@@ -1,0 +1,7 @@
+# dbt_utils: generate_surrogate_key, date_spine, unique_combination_of_columns (Phase 4).
+# dbt-expectations: distributional range tests (Phase 5).
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.3.0", "<2.0.0"]
+  - package: metaplane/dbt_expectations
+    version: [">=0.10.0", "<1.0.0"]

@@ -1,0 +1,32 @@
+# dbt connection profiles for this project.
+#
+# Every credential comes from an environment variable (see ../.env.example) — nothing here is a
+# literal secret, so this file is safe to commit.
+#
+# Two targets under one profile:
+#   duckdb    — a local file, no cloud account needed. Default, so `dbt debug`/`dbt build` work
+#               out of the box for anyone who clones the repo.
+#   snowflake — the real warehouse. Select it with `--target snowflake` or DBT_TARGET=snowflake.
+#
+# Invoke dbt from the repo root with:
+#   dbt debug --project-dir dbt --profiles-dir dbt
+# (the Makefile's dbt-* targets already do this).
+
+bridge_pipeline:
+  target: "{{ env_var('DBT_TARGET', 'duckdb') }}"
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'bridge.duckdb') }}"
+      threads: 4
+
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'BRIDGE_DBT_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'BRIDGE_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'BRIDGE_DB') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'STAGING') }}"
+      threads: 4
