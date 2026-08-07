@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: stg_series_metadata
+    description: >
+      One row per FRED series, renamed and typed from raw_fred.series_metadata. No joins,
+      no business logic — the CRE-relevant `group` classification lives in a dbt seed
+      consumed by dim_series (Phase 4), not here.
+    columns:
+      - name: series_id
+        description: FRED's own series identifier, e.g. DGS10. Primary key.
+        tests:
+          - not_null
+          - unique
+      - name: title
+        description: Series title as published by FRED.
+        tests:
+          - not_null
+      - name: frequency
+        description: FRED's short frequency code (D daily, M monthly, Q quarterly, ...).
+        tests:
+          - not_null
+      - name: units
+        description: Units of the published value, as FRED describes them.
+      - name: seasonal_adjustment
+        description: FRED's seasonal adjustment short code (SA seasonally adjusted, NSA not).
+      - name: observation_start_date
+        description: Earliest observation date FRED has ever published for this series.
+        tests:
+          - not_null
+      - name: observation_end_date
+        description: Most recent observation date FRED had published as of the last pull.
+        tests:
+          - not_null
+      - name: fetched_at
+        description: When this row was landed (by the ingest pipeline, or generated into the seed fixture).
+        tests:
+          - not_null
+
+  - name: stg_observations
+    description: >
+      Vintage-aware FRED/ALFRED observations, renamed and typed from raw_fred.observations.
+      Grain: one row per (series_id, obs_date, realtime_start_date) — enforced by
+      tests/assert_stg_observations_unique_grain.sql, since dbt's built-in `unique` test only
+      covers a single column. No joins, no business logic, no aggregation.
+    columns:
+      - name: series_id
+        description: FRED's own series identifier. Part of the composite primary key.
+        tests:
+          - not_null
+      - name: obs_date
+        description: The economic observation date. Part of the composite primary key.
+        tests:
+          - not_null
+      - name: value
+        description: >
+          The observed value, cast to a number. FRED's "." missing-value marker (and anything
+          else unparseable) becomes null here via try_cast rather than the row being dropped —
+          see DECISIONS.md's Phase 3 entry.
+      - name: realtime_start_date
+        description: >
+          First date this specific vintage of the value was known to be current. Part of the
+          composite primary key — see DECISIONS.md's Phase 2 entry for why this, not obs_date
+          alone, is the versioning key.
+        tests:
+          - not_null
+      - name: realtime_end_date
+        description: Last date this vintage was current before a later revision superseded it, or 9999-12-31 if it's still the current value.
+        tests:
+          - not_null
+      - name: fetched_at
+        description: When this row was landed (by the ingest pipeline, or generated into the seed fixture).
+        tests:
+          - not_null
