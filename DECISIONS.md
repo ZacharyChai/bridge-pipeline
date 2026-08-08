@@ -1,8 +1,24 @@
 # DECISIONS.md
 
-Running log of non-obvious choices made during the dbt/Snowflake rebuild, why, and what was
-rejected. Phase 7 consolidates this into a coherent narrative; until then it's organized by
-phase.
+Every non-obvious choice made during the dbt/Snowflake rebuild: the decision, the alternatives
+considered, why this one, and what would change the answer. Organized by phase, in the order
+the work actually happened — that order is itself part of the story (several entries exist
+*because* something built in an earlier phase surfaced a problem that changed a later one, e.g.
+Phase 2's vintage-cap discovery reshaping the ingest design, or Phase 4/5's two incidents
+reshaping how seeds and CI are configured). `INTERVIEW_NOTES.md` is the short, spoken-register
+companion to this document — grain statements in one sentence, the three hardest problems, the
+questions an interviewer would actually ask. This file is the long-form backing for those
+answers.
+
+**Contents**: [Phase 1](#phase-1-snowflake-connection-and-the-duckdb-fallback) (Snowflake vs.
+alternatives, DuckDB fallback, warehouse sizing) · [Phase 2](#phase-2-ingestion-into-the-raw-layer)
+(series selection, the ALFRED vintage-cap discovery, idempotency, a real merge-key bug) ·
+[Phase 3](#phase-3-staging-layer) (materialization, missing-value handling, DuckDB seeds) ·
+[Phase 4](#phase-4-dimensional-marts) (grain statements, star vs. snowflake, the SCD Type 2
+approach, surrogate keys, derived measures, a real production-data incident) ·
+[Phase 5](#phase-5-testing-and-data-quality) (test severity policy, distributional bounds, a
+second real incident) · [Phase 6](#phase-6-ci-and-documentation) (CI design, why docs build
+against DuckDB, the lineage image, final verified status).
 
 ---
 
@@ -563,14 +579,22 @@ rendered as disconnected-looking duplicate nodes with no explanation. `dim_serie
 has no such collision and stays. Kept as a real, reusable script (not a one-off) since the
 graph needs regenerating after any change to the model DAG.
 
-### What's built versus what's live
+### What's built versus what's live — verified, not assumed
 
-Everything above is written, and independently verified against real Snowflake and DuckDB —
-but as of this entry, nothing has been pushed: no commit has been made (per this session's own
-rule of not committing without being asked), the `SNOWFLAKE_ACCOUNT`/`SNOWFLAKE_USER`/
-`SNOWFLAKE_PASSWORD` GitHub Actions secrets the new `dbt-build` job needs don't exist yet on
-the repo, and GitHub Pages isn't enabled. The README's Phase 6 status is marked "in progress,"
-not "done," until those three things happen and a real PR run is observed green — see the
-session's own next message for that checklist. Flagging this explicitly because CLAUDE.md's
-rule against claiming a capability the repo doesn't have applies to this decisions log too,
-not just the README.
+Everything above was independently verified against real Snowflake and DuckDB before being
+called done, including the CI wiring itself: the three `SNOWFLAKE_*` GitHub Actions secrets
+were set, GitHub Pages was enabled (`build_type: workflow`, confirmed the resulting URL matches
+what's in the README exactly), and the rebuild was pushed as a PR rather than straight to
+`main` specifically so the new `dbt-build` job's isolated-schema-plus-teardown could be watched
+running for real on a pull request before merging — not just trusted because it looked right
+locally. It passed (`lint-and-test` and `dbt-build` both green, `publish-docs`/
+`build-and-push`/`deploy` correctly skipped on a PR since they're gated to `main`). After
+merging, all five jobs ran on the push to `main` and passed, including `deploy` (the legacy
+Postgres/GCE path — a real SSH deploy to the live box, unaffected functionally by this rebuild
+but real infrastructure nonetheless) and `publish-docs`, which was then checked by loading the
+live URL and confirming it actually renders the dbt docs site, not assumed from the job's green
+checkmark alone. This "verify by observing the real system, not by trusting a local run or a
+green checkmark" habit shows up repeatedly across this document (the Phase 1 `AUTO_SUSPEND`
+check, the Phase 2 row-count reconciliation, the Phase 4 and 5 incidents were both caught by
+noticing real data looked wrong, not by a test) — it's as much a decision about *how to work* as
+any individual technical choice above.

@@ -146,9 +146,11 @@ every merge to `main` and publish to GitHub Pages:
 
 Locally: `make dbt-docs`.
 
-[`DECISIONS.md`](DECISIONS.md) is the project's running design log — grain statements, the
+[`DECISIONS.md`](DECISIONS.md) is the project's full design log — grain statements, the
 SCD Type 2 approach and what was rejected, surrogate key strategy, every non-obvious choice
-and why, organized by phase.
+and why, organized by phase. [`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md) is the short,
+spoken-register companion: the three hardest problems and how they got solved, likely
+interviewer questions with answers, and an honest list of what this project doesn't do.
 
 ## Legacy path: Postgres + GCE
 
@@ -179,8 +181,9 @@ Local dev instructions for this path: [`SETUP.md`](SETUP.md).
 | Phase 3 — staging layer | done |
 | Phase 4 — dimensional marts, SCD Type 2 | done |
 | Phase 5 — testing and data quality | done |
-| Phase 6 — CI and documentation | in progress |
-| Phase 7 — decisions record, interview notes | not started |
+| Phase 6 — CI and documentation | done |
+| Phase 7 — decisions record ([`DECISIONS.md`](DECISIONS.md)), interview notes ([`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md)) | done |
+| Phase 8 — Dagster orchestration (optional) | not started |
 
 ## Repository layout
 
@@ -206,6 +209,7 @@ docs/                             lineage.png
 .github/                          CI workflow
 AUDIT.md                          Phase 0 audit of the pre-rebuild repo
 DECISIONS.md                      design decisions, by phase
+INTERVIEW_NOTES.md                spoken-register companion to DECISIONS.md
 Dockerfile, docker-compose.yml    legacy local dev image + stack
 Makefile                          test/lint/dbt-*/sqlfluff-* targets
 SETUP.md                          legacy local-dev setup walkthrough
