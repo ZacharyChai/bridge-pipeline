@@ -18,7 +18,9 @@ alternatives, DuckDB fallback, warehouse sizing) · [Phase 2](#phase-2-ingestion
 approach, surrogate keys, derived measures, a real production-data incident) ·
 [Phase 5](#phase-5-testing-and-data-quality) (test severity policy, distributional bounds, a
 second real incident) · [Phase 6](#phase-6-ci-and-documentation) (CI design, why docs build
-against DuckDB, the lineage image, final verified status).
+against DuckDB, the lineage image, final verified status) ·
+[Phase 8](#phase-8-orchestration) (Airflow vs. Dagster, LocalExecutor vs. managed/Celery, why
+the live GCE cron entry stays put, idempotent backfills, real bugs hit standing this up).
 
 ---
 
@@ -598,3 +600,148 @@ green checkmark" habit shows up repeatedly across this document (the Phase 1 `AU
 check, the Phase 2 row-count reconciliation, the Phase 4 and 5 incidents were both caught by
 noticing real data looked wrong, not by a test) — it's as much a decision about *how to work* as
 any individual technical choice above.
+
+## Phase 8: orchestration
+
+### Airflow, not Dagster — reversing the Phase 6 sketch
+
+`INTERVIEW_NOTES.md`'s "what would you build next" answer (written during Phase 7) named
+Dagster, modeling the FRED ingest and dbt build as one graph of assets. This phase built
+Airflow instead, and that's worth being honest about rather than quietly rewriting history:
+Dagster's asset-centric model is arguably a better conceptual fit for "ingest feeds a dbt
+project," but Airflow is the far more common ask in the postings this project targets, and the
+TaskFlow API (`@dag`/`@task`) demonstrates the same DAG-authoring, retry, and idempotency
+concepts an interviewer would probe regardless of which tool answers the question. Given a
+choice between the tool that fits the data model more elegantly and the tool more of the
+target audience will actually recognize on a resume, this project picked the second — the same
+"target the postings" logic Phase 1 used to pick Snowflake over BigQuery.
+
+### LocalExecutor + local Docker Compose, not managed Airflow or Celery
+
+Three alternatives considered and rejected, all for the same underlying reason — this is one
+daily DAG per pipeline, not horizontal scale across many concurrent DAGs:
+
+- **MWAA / Cloud Composer** bill hourly for a managed control plane. Running one for a resume
+  bullet, then having to explain in an interview why a portfolio project pays for managed
+  infrastructure it didn't need, is a worse outcome than not having it — the honest answer to
+  "why not managed Airflow" (cost, and the workload doesn't need it) is a stronger interview
+  moment than a screenshot of an idle MWAA environment.
+- **CeleryExecutor / KubernetesExecutor** solve horizontal scaling across many concurrent
+  workers. Reaching for them here — two DAGs, one run each per day — is architecture that
+  doesn't match the actual workload, which reads as copied from a tutorial rather than
+  understood. LocalExecutor runs both DAGs' tasks as subprocesses of the scheduler, which is
+  the entire amount of concurrency this project needs.
+- **The official docker-compose.yaml itself defaults to CeleryExecutor** (with Redis, a worker,
+  and Flower) — see `orchestration/docker-compose.yaml`'s header comment for the specific
+  services stripped out and why. Adapted rather than used verbatim, and adapted from the real
+  file (fetched from `airflow.apache.org` while building this, not reconstructed from memory —
+  Airflow 3 split the old 2.x webserver into a separate `airflow-apiserver` plus its own
+  `airflow-dag-processor` service, a structural change worth getting right rather than guessing).
+
+What would change the answer: genuinely needing to run many independent DAGs concurrently, or
+specifically interviewing at a shop known to run MWAA/Composer (in which case spinning up the
+smallest managed environment just long enough to screenshot it, then tearing it down before
+next month's bill, is the one scenario where the managed cost is worth paying).
+
+### Both pipelines get a DAG, not just the unscheduled one
+
+Only the Snowflake pipeline was actually missing scheduling (`INTERVIEW_NOTES.md`'s "no
+scheduled ingestion for the Snowflake path" — the legacy Postgres pipeline already runs daily
+via the GCE cron entry). `legacy_postgres_pipeline` was built anyway, alongside
+`snowflake_dbt_pipeline`, because the interesting orchestration concepts — TaskFlow wiring,
+retries with backoff, a failure callback, idempotent reruns, a DAG-integrity test — are
+identical either way, and demonstrating both means the DAGs read as a general orchestration
+capability applied twice, not a one-off script for a single pipeline.
+
+### Why the live GCE cron entry stays untouched
+
+`deploy/bridge-pipeline.cron` keeps running the legacy pipeline on the production VM exactly as
+it did before this phase. Local Airflow was never a candidate to replace it: this project's own
+Phase 1 reasoning against managed Airflow (cost, scope) applies just as directly to *deploying*
+a self-hosted Airflow instance to run production infrastructure — that's real ops work (uptime,
+upgrades, secrets management for a persistent service) that doesn't serve this project's actual
+goal, which is demonstrating orchestration skill, not operating a second production scheduler
+next to the first one. The local Airflow instance runs the identical `extract -> quality_gate
+-> load` sequence as a DAG so the capability is real and demonstrable (`make airflow-up`,
+trigger a run, watch it succeed), without anything about the live box changing. Same pattern as
+the DuckDB/Snowflake split in Phase 1: show the real thing locally, don't make a reviewer stand
+up cloud infrastructure to see it work.
+
+### Idempotent reruns and backfills — by construction, not by new logic
+
+Neither DAG does incremental, partition-by-`execution_date` loading. `extract()` re-fetches
+FRED's full current series state every run; `ingest_series()` re-fetches vintage history (or
+current value) for all 17 series every run. Both land into loaders that already upsert on a
+composite key (`db.py`'s `(series_id, date)`, `db_snowflake.py`'s vintage- or current-keyed
+MERGE — see Phase 2's idempotency-bug writeup for why there are two different loaders in the
+first place). The consequence: a scheduler-triggered rerun, a manually triggered rerun, or an
+Airflow backfill of a past date all produce the exact same end state as a single run, because
+every run reloads the same full state and MERGEs it in — there is no backfill-specific code
+path to get wrong. The tradeoff is real and worth naming, not hiding: this only works because
+the ingest volume stays small enough (116K rows) that a full pull every run is cheap. A
+much larger source would need genuine incremental logic, and *then* Airflow's
+`data_interval_start`/`data_interval_end` would need to actually drive the fetch window instead
+of being ignored.
+
+### A JSON-XCom gotcha, and why `dbt_build` gets a dict, not the mart data
+
+`transform()` (in `transform/transform.py`) returns rows with a `datetime.date` field, and
+Airflow's XCom backend serializes task outputs as JSON by default — `datetime.date` isn't
+JSON-serializable, so `quality_gate()` converts `date` to an ISO string before returning, and
+`load()` converts it back on the way in. Small, easy to miss, and exactly the kind of thing
+that passes a first local test (Python doesn't complain until the value actually crosses the
+XCom boundary) and then breaks on the real scheduler. `snowflake_dbt_pipeline` sidesteps the
+question entirely for its own data: `ingest_series()` returns a small totals dict
+(`{"series": int, "observations": int}`) for logging and to force the dependency edge, not the
+17-series payload itself — that stays inside Snowflake RAW, which is the entire point of
+landing it in a warehouse rather than passing it through the orchestrator.
+
+### The DAG-integrity test runs inside the Airflow container, not the project's own venv
+
+`orchestration/tests/test_dag_integrity.py` uses `DagBag` to assert both DAGs import without
+error and have the expected tasks, retries, and failure callback. It runs via
+`make dag-test` / the CI job of the same shape, both of which exec into the already-built
+Airflow image — not `pytest` in the root `.venv`. Considered and rejected: adding `apache-
+airflow` to `requirements-dev.txt` so `make test` covers it directly. Rejected because Airflow
+pins a large, particular set of transitive dependencies (via its own constraints file) that
+risked real conflicts with dbt-core's equally large dependency tree in the same environment —
+for a test that only needs to run somewhere Airflow is already installed correctly, which the
+Airflow image already is.
+
+### Real bugs hit standing this up (kept, not edited out)
+
+- **`chown` failing inside `airflow-init`.** The official init script's last step
+  `chown`s `/opt/airflow/{logs,dags,plugins}` to `AIRFLOW_UID`. On Colima (this project's local
+  Docker runtime — see `SETUP.md`), the bind-mounted host directories are shared over SSHFS,
+  which doesn't support real UID ownership changes from inside the VM. Fixed by pre-creating
+  those directories on the host with open permissions and making the `chown` best-effort
+  (`|| true`) rather than fighting the filesystem for a guarantee this local setup doesn't need.
+- **`DagBag(include_examples=False)` no longer exists.** Airflow 3 dropped the kwarg — with
+  `AIRFLOW__CORE__LOAD_EXAMPLES: 'false'` already set globally (in
+  `orchestration/docker-compose.yaml`), it wasn't needed anyway; the test just calls
+  `DagBag(dag_folder=...)` now.
+- **The Airflow image's entrypoint intercepts plain commands.** `docker compose run --rm
+  airflow-scheduler pytest ...` doesn't run pytest — the image's entrypoint script treats its
+  first argument as a potential Airflow CLI subcommand, and falls through to printing `airflow
+  --help` for anything it doesn't recognize. Both `make dag-test` and the CI job override the
+  entrypoint directly (`--entrypoint /bin/bash ... -c "pytest ..."`) instead, the same
+  workaround the official compose file's `airflow-cli` service uses for the same underlying
+  issue (referenced there as apache/airflow#16252).
+- **`callbacks.py` wasn't importable from a bare `DagBag()` call.** `from callbacks import
+  log_failure` works when Airflow's real `airflow-dag-processor` service parses the DAG files
+  (it puts the dags folder on `sys.path` itself first) but not when `DagBag` is instantiated
+  directly from a plain pytest process — confirmed by running `airflow dags list-import-errors`
+  (clean) right before the standalone test failed with `ModuleNotFoundError`, which is what
+  pointed at the real cause. Fixed with an explicit `sys.path.insert(0, "/opt/airflow/dags")`
+  at the top of the test file.
+
+### Verified, not assumed
+
+Both DAGs were built with `docker compose build`, brought up with `docker compose up -d` against
+this project's real Colima runtime, confirmed with zero entries in `airflow dags
+list-import-errors`, unpaused, and triggered for a real run each — `legacy_postgres_pipeline`
+against a real (local, containerized) Postgres, `snowflake_dbt_pipeline` against the same live
+Snowflake account every other phase of this project uses, including a real `dbt build`. The
+DAG-integrity suite (four tests: no import errors, both DAGs present, exact expected task sets,
+every task has retries and a failure callback) was run inside the actual Airflow container, not
+assumed to pass from reading the DAG files.

@@ -1,0 +1,179 @@
+# Local Airflow (LocalExecutor) for bridge-pipeline's two DAGs. Adapted from Apache's
+# official docker-compose.yaml (https://airflow.apache.org/docs/apache-airflow/stable/
+# docker-compose.yaml, apache/airflow:3.3.0 at the time this was written) with:
+#   - CeleryExecutor -> LocalExecutor, and the Celery/Redis/worker/flower services it
+#     needed dropped entirely -- see DECISIONS.md for why: this is one daily DAG per
+#     pipeline, not horizontal scale across many concurrent DAGs, so Celery's machinery
+#     would be architecture that doesn't match the workload.
+#   - `image:` swapped for `build:`, pointing at ./Dockerfile, which layers this
+#     project's own requirements + dbt onto the stock image.
+#   - a second Postgres (app-postgres) added -- the legacy pipeline's own warehouse,
+#     separate from Airflow's metadata DB, so this stack is self-contained and doesn't
+#     depend on the root docker-compose.yml also being up.
+#   - the whole repo bind-mounted into the containers so DAG tasks can `import ingest`,
+#     `import config`, etc., and so `dbt build` runs against the same dbt/ project the
+#     Makefile targets use locally.
+#
+# Airflow 3's apiserver replaces the old 2.x webserver; dag-processor is now its own
+# service instead of living inside the scheduler. Both still needed even without Celery.
+#
+# Usage: `make airflow-up` (from the repo root) or `docker compose up --build` from here.
+
+x-airflow-common:
+  &airflow-common
+  build:
+    context: ..
+    dockerfile: orchestration/Dockerfile
+  env_file:
+    - ../.env
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY:-}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
+    AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    # This project's own settings (config.py / db.py / dbt profiles.yml all read these).
+    PYTHONPATH: /opt/airflow/bridge-pipeline
+    DBT_TARGET: snowflake
+    POSTGRES_HOST: app-postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: bridge
+    POSTGRES_USER: bridge
+    POSTGRES_PASSWORD: change_me
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ..:/opt/airflow/bridge-pipeline
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    airflow-postgres:
+      condition: service_healthy
+    app-postgres:
+      condition: service_healthy
+
+services:
+  airflow-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  # The legacy pipeline's own warehouse -- same schema as the root docker-compose.yml's
+  # `db` service, but standalone here so this stack doesn't need that one also running.
+  app-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bridge
+      POSTGRES_USER: bridge
+      POSTGRES_PASSWORD: change_me
+    volumes:
+      - app-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bridge -d bridge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: always
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -v -p /opt/airflow/{logs,dags,plugins}
+        /entrypoint airflow version
+        # Best-effort: on macOS bind mounts (e.g. Colima's sshfs), chown onto the host
+        # filesystem isn't supported and always fails -- harmless here since the host
+        # dirs are pre-created with open permissions (see README's Airflow setup step).
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins} || true
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin}
+    user: "0:0"
+
+volumes:
+  airflow-db-volume:
+  app-db-volume:

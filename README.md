@@ -42,6 +42,26 @@ Full lineage graph, generated straight from the dbt DAG:
 
 ![dbt lineage graph](docs/lineage.png)
 
+### Orchestration
+
+`orchestration/` runs both pipelines above under a local Airflow instance (LocalExecutor,
+TaskFlow `@dag`/`@task`, Docker Compose) instead of leaving them triggered by hand:
+
+```
+legacy_postgres_pipeline   extract -> quality_gate -> load           (FRED DGS10 -> Postgres)
+snowflake_dbt_pipeline     ingest_series -> dbt_build                (FRED/ALFRED -> Snowflake RAW -> marts)
+```
+
+```bash
+make airflow-up    # http://localhost:8080 (admin/admin)
+make dag-test       # DagBag import + task-structure checks, run inside the Airflow container
+```
+
+Retries with exponential backoff are on the FRED-API extract task specifically (the flakiest
+step in either DAG), each DAG has a structured on-failure callback, and reruns/backfills are
+idempotent by construction — see [`DECISIONS.md`](DECISIONS.md#phase-8-orchestration) for why,
+and for why the live GCE cron entry (below) stays untouched rather than being pointed here.
+
 ### Why this shape
 
 - **Vintages, not just current values.** FRED/ALFRED data gets revised — a monthly CPI print
@@ -109,8 +129,8 @@ run against Snowflake (`dbt seed`'s raw-table targets are disabled there — see
 ## Stack
 
 Python 3.13 · dbt-core + dbt-snowflake + dbt-duckdb · Snowflake · DuckDB · dbt_utils ·
-dbt-expectations · sqlfluff · pytest · ruff · GitHub Actions · Postgres 16 (legacy path) ·
-Docker · Terraform · cron · Uptime Kuma.
+dbt-expectations · Airflow (LocalExecutor, TaskFlow API) · sqlfluff · pytest · ruff ·
+GitHub Actions · Postgres 16 (legacy path) · Docker · Terraform · cron · Uptime Kuma.
 
 ## Testing & CI
 
@@ -134,8 +154,9 @@ COVID labor-market shock, exactly as intended — a genuine historical extreme, 
 flagged, not blocking the build).
 
 GitHub Actions runs ruff, sqlfluff, the full pytest suite (against a real Postgres service
-container), and `dbt build` + `dbt source freshness` against an isolated Snowflake schema —
-created and torn down per pull request — on every PR. See
+container), `dbt build` + `dbt source freshness` against an isolated Snowflake schema —
+created and torn down per pull request — and a DAG-integrity job (both DAGs import cleanly,
+have the expected tasks, retries, and failure callback) on every PR. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Documentation
@@ -156,7 +177,11 @@ interviewer questions with answers, and an honest list of what this project does
 
 The original version of this project ingested one FRED series (`DGS10`, current values only)
 into Postgres, containerized, and deployed continuously to a hardened GCE VM. That path is
-kept running, not deleted in one pass — it still pulls fresh data daily.
+kept running, not deleted in one pass — it still pulls fresh data daily, on the same GCE cron
+entry it always has ([`deploy/bridge-pipeline.cron`](deploy/bridge-pipeline.cron)). The local
+Airflow instance (above) runs the same `extract -> quality_gate -> load` sequence as a DAG for
+demonstration, but doesn't control the live box — see
+[`DECISIONS.md`](DECISIONS.md#phase-8-orchestration) for why that cron entry stays put.
 
 - **Provisioning** ([`infra/`](infra/)) — Terraform stands up the VM (SSH-only firewall,
   key-only auth, non-root deploy user).
@@ -183,7 +208,7 @@ Local dev instructions for this path: [`SETUP.md`](SETUP.md).
 | Phase 5 — testing and data quality | done |
 | Phase 6 — CI and documentation | done |
 | Phase 7 — decisions record ([`DECISIONS.md`](DECISIONS.md)), interview notes ([`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md)) | done |
-| Phase 8 — Dagster orchestration (optional) | not started |
+| Phase 8 — Airflow orchestration ([`orchestration/`](orchestration/)) | done |
 
 ## Repository layout
 
@@ -201,6 +226,10 @@ dbt/                              dbt project
   seeds/                           DuckDB fixture data (real, trimmed FRED/ALFRED snapshot)
   tests/                           singular tests — business logic, not schema
   macros/                          generate_schema_name override
+orchestration/                    local Airflow (LocalExecutor) -- both pipelines' DAGs
+  dags/                             legacy_postgres_pipeline.py, snowflake_dbt_pipeline.py
+  tests/                            DAG-integrity checks (DagBag, run inside the container)
+  docker-compose.yaml, Dockerfile   adapted from Airflow's official compose -- see DECISIONS.md
 infra/                            Terraform (legacy GCE) + snowflake_setup.sql
 deploy/                           legacy CD scripts, prod compose, cron, backup
 scripts/                          generate_dbt_seeds.py, generate_lineage_graph.py, db-tunnel.sh
