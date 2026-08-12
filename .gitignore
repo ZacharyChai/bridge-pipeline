@@ -39,5 +39,10 @@ dbt/.user.yml
 # scripts/generate_dbt_seeds.py from a live FRED pull) -- carve them out of the *.csv rule above.
 !dbt/seeds/*.csv
 
+# Airflow (orchestration/) -- runtime state, not project source
+orchestration/logs/
+orchestration/plugins/
+orchestration/config/
+
 # OS
 .DS_Store

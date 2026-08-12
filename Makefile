@@ -1,7 +1,7 @@
 # Bridge Project — task runner.
 # Targets fill in as milestones land; each target notes the milestone that implements it.
 
-.PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix
+.PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix airflow-up airflow-down airflow-logs dag-test
 
 # Prefer the project venv if it exists, so targets never fall back to system Python.
 PYTHON := $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
@@ -78,3 +78,18 @@ sqlfluff-lint:     ## Lint dbt models + singular tests (Snowflake dialect, see d
 
 sqlfluff-fix:      ## Auto-fix what sqlfluff can
 	$(LOAD_ENV) cd dbt && ../$(SQLFLUFF) fix models/ tests/
+
+airflow-up:        ## Start local Airflow (LocalExecutor) orchestrating both pipelines -- http://localhost:8080
+	mkdir -p orchestration/logs orchestration/plugins orchestration/config
+	chmod -R 777 orchestration/logs orchestration/plugins orchestration/config
+	cd orchestration && docker compose up --build -d
+
+airflow-down:      ## Stop local Airflow and remove its containers
+	cd orchestration && docker compose down
+
+airflow-logs:      ## Tail the Airflow scheduler's logs
+	cd orchestration && docker compose logs -f airflow-scheduler
+
+dag-test:          ## Run the DAG-integrity test suite inside the Airflow container
+	cd orchestration && docker compose run --rm --entrypoint /bin/bash airflow-scheduler \
+	  -c "pytest -q /opt/airflow/bridge-pipeline/orchestration/tests"

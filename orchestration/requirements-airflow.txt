@@ -1,0 +1,10 @@
+# dbt, installed into the Airflow image itself (not a separate container) so
+# snowflake_dbt_pipeline's dbt_build task can call the `dbt` binary directly. Same pins as
+# ../requirements-dev.txt, kept in sync by hand -- see DECISIONS.md.
+dbt-core==1.10.22
+dbt-snowflake==1.10.8
+dbt-duckdb==1.10.1
+
+# Runs inside the Airflow container, not the project's own venv -- see
+# orchestration/tests/test_dag_integrity.py's docstring for why.
+pytest>=8.0

@@ -102,6 +102,30 @@ jobs:
           --args "{schema_name: ${{ env.SNOWFLAKE_SCHEMA }}}"
           --project-dir dbt --profiles-dir dbt --target snowflake
 
+  dag-integrity:
+    # DagBag import + task-structure checks for both Airflow DAGs, run inside the real
+    # Airflow image (see orchestration/tests/test_dag_integrity.py's docstring for why
+    # not the main venv). No FRED/Snowflake secrets needed -- DAG parsing never touches
+    # them, only the task bodies do at actual run time.
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fake .env (DAG parsing needs no real secrets)
+        run: cp .env.example .env
+
+      - name: Build image and run DAG-integrity tests
+        working-directory: orchestration
+        run: |
+          docker compose run --rm --entrypoint /bin/bash airflow-scheduler \
+            -c "pytest -q /opt/airflow/bridge-pipeline/orchestration/tests"
+
+      - name: Tear down
+        if: always()
+        working-directory: orchestration
+        run: docker compose down -v
+
   publish-docs:
     # dbt docs, built against the duckdb target (self-contained, no Snowflake credentials
     # needed just to generate documentation HTML) and published to GitHub Pages. Only on

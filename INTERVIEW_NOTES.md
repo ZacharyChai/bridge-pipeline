@@ -108,16 +108,33 @@ real normalization win from splitting the category off into its own dimension �
 an extra join that makes the model look more complicated than the data actually is.
 
 **"What would you build next if you kept going?"**
-Orchestration — right now the Snowflake ingest is triggered by hand, not on a schedule, which
-is the one piece of real production shape this repo doesn't have yet. That's Phase 8 territory:
-Dagster, modeling the FRED ingest and the dbt project as one graph of assets, on a daily
-schedule. See the limitations section below for the fuller list.
+That used to be my answer to this question, until I actually built it: orchestration. Both
+pipelines now run under a local Airflow instance (LocalExecutor, TaskFlow API,
+`orchestration/`) instead of being triggered by hand or living only on a GCE cron entry. I'd
+originally sketched this as Dagster, modeling the ingest and dbt project as one graph of
+assets — Airflow's TaskFlow API ended up being the better call for a resume-facing project
+specifically because it's the far more common ask in postings, even though Dagster's
+asset-centric model arguably fits "ingest feeds a dbt build" more elegantly. Worth saying that
+distinction out loud unprompted, the same way the other tradeoffs in this document are — see
+`DECISIONS.md`'s Phase 8 for the full reasoning, including why local Compose over managed
+Airflow, and why the live GCE cron entry stays untouched rather than being pointed at a local
+Airflow instance. What's actually still missing: incremental/partitioned loading (both DAGs do
+a full re-pull and MERGE every run, which only stays cheap at this data volume) and real
+alerting (the failure callback logs a structured event; it doesn't page anyone yet).
 
 ## What this project honestly does not do
 
-- **No scheduled ingestion for the Snowflake path.** The legacy Postgres pipeline still runs on
-  a daily cron on a live box; the new Snowflake pipeline is run by hand. Orchestrating it is
-  the explicit, deliberately-deferred Phase 8.
+- **The Snowflake pipeline's schedule is local, not deployed.** `orchestration/`'s Airflow
+  instance schedules both pipelines, but it only runs on demand on this machine — it isn't
+  standing anywhere with an uptime guarantee the way the legacy Postgres pipeline's GCE cron
+  entry is. The orchestration *capability* is real and demonstrable (`make airflow-up`); a
+  genuinely production Snowflake pipeline would still need that DAG deployed somewhere
+  persistent, which was deliberately out of scope — see `DECISIONS.md`'s Phase 8 for why.
+- **Neither DAG does incremental loading.** Every run re-fetches full current state (all 17
+  series) and MERGEs it in, rather than using Airflow's own `data_interval_start`/
+  `data_interval_end` to pull just what changed. Cheap and safe at ~116K rows — including
+  making backfills trivially idempotent, since a rerun and a fresh run produce the same
+  result — but wouldn't stay cheap at real production volume.
 - **The mart isn't point-in-time-safe by default.** `mart_cre_macro_conditions` is built from
   `fct_observations_latest` — today's best-known view of history. If you backtest against the
   mart itself, you're backtesting with revised numbers, not the numbers that were actually
@@ -133,9 +150,10 @@ schedule. See the limitations section below for the fuller list.
   saying out loud unprompted rather than waiting to be caught.
 - **The business-day flag doesn't know about federal holidays.** It's Monday-through-Friday
   only. A proper holiday calendar was out of scope for what this needed to prove.
-- **No monitoring or alerting on the Snowflake pipeline.** The legacy Postgres path has Uptime
-  Kuma heartbeats and backup verification from the original M0-M6 build; the new pipeline has
-  none of that yet, because it isn't scheduled yet either — the two would come together.
+- **No real alerting on either Airflow DAG.** Both have a structured on-failure callback
+  (`orchestration/dags/callbacks.py`), but it logs a JSON event rather than paging anyone — no
+  Slack/PagerDuty integration. The legacy Postgres path's Uptime Kuma heartbeats (from the
+  original M0-M6 build) are the only real alerting in this project.
 - **The DuckDB seed fixture is a point-in-time snapshot, not a live sync.** It was generated
   once from a real FRED pull and will read as increasingly "old" over time unless someone
   re-runs `scripts/generate_dbt_seeds.py`. That's an accepted tradeoff for keeping the fixture
