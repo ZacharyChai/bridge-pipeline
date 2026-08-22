@@ -82,14 +82,18 @@ sqlfluff-fix:      ## Auto-fix what sqlfluff can
 airflow-up:        ## Start local Airflow (LocalExecutor) orchestrating both pipelines -- http://localhost:8080
 	mkdir -p orchestration/logs orchestration/plugins orchestration/config
 	chmod -R 777 orchestration/logs orchestration/plugins orchestration/config
-	cd orchestration && docker compose up --build -d
+	cd orchestration && docker compose --env-file ../.env up --build -d
+	# Colima's host port-forward is broken on this dev host (see SETUP.md) -- same
+	# workaround db-tunnel.sh already uses for Postgres, reused here for port 8080.
+	HOST_PORT=8080 GUEST_PORT=8080 ./scripts/db-tunnel.sh start
 
 airflow-down:      ## Stop local Airflow and remove its containers
+	HOST_PORT=8080 GUEST_PORT=8080 ./scripts/db-tunnel.sh stop
 	cd orchestration && docker compose down
 
 airflow-logs:      ## Tail the Airflow scheduler's logs
 	cd orchestration && docker compose logs -f airflow-scheduler
 
 dag-test:          ## Run the DAG-integrity test suite inside the Airflow container
-	cd orchestration && docker compose run --rm --entrypoint /bin/bash airflow-scheduler \
+	cd orchestration && docker compose --env-file ../.env run --rm --entrypoint /bin/bash airflow-scheduler \
 	  -c "pytest -q /opt/airflow/bridge-pipeline/orchestration/tests"

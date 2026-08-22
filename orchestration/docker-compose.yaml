@@ -17,7 +17,13 @@
 # Airflow 3's apiserver replaces the old 2.x webserver; dag-processor is now its own
 # service instead of living inside the scheduler. Both still needed even without Celery.
 #
-# Usage: `make airflow-up` (from the repo root) or `docker compose up --build` from here.
+# Usage: `make airflow-up` (from the repo root) or `docker compose --env-file ../.env
+# up --build` from here. The --env-file flag matters: it's what makes root .env's
+# values available for this file's own ${VAR} substitutions (FERNET_KEY, AIRFLOW_UID,
+# _AIRFLOW_WWW_USER_*) -- that's a separate mechanism from the env_file: directive
+# below, which only affects the *containers'* runtime environment, not the compose
+# YAML's own variable interpolation. Without --env-file, those four vars silently fall
+# back to their hardcoded defaults even if you set them in root .env.
 
 x-airflow-common:
   &airflow-common
@@ -50,6 +56,7 @@ x-airflow-common:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./config:/opt/airflow/config
     - ..:/opt/airflow/bridge-pipeline
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -160,12 +167,12 @@ services:
     command:
       - -c
       - |
-        mkdir -v -p /opt/airflow/{logs,dags,plugins}
+        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
         /entrypoint airflow version
         # Best-effort: on macOS bind mounts (e.g. Colima's sshfs), chown onto the host
         # filesystem isn't supported and always fails -- harmless here since the host
         # dirs are pre-created with open permissions (see README's Airflow setup step).
-        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins} || true
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config} || true
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'

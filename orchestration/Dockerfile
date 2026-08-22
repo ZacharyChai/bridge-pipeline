@@ -5,6 +5,9 @@
 ARG AIRFLOW_IMAGE_NAME=apache/airflow:3.3.0
 FROM ${AIRFLOW_IMAGE_NAME}
 
-COPY requirements.txt /tmp/requirements.txt
-COPY orchestration/requirements-airflow.txt /tmp/requirements-airflow.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt -r /tmp/requirements-airflow.txt
+# Mirrors the real repo layout (dbt-versions.txt at the root, requirements-airflow.txt
+# under orchestration/) so that file's `-r ../dbt-versions.txt` resolves the same way
+# here as it does for a plain `pip install` from a checked-out clone.
+COPY requirements.txt dbt-versions.txt /tmp/
+COPY orchestration/requirements-airflow.txt /tmp/orchestration/requirements-airflow.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt -r /tmp/orchestration/requirements-airflow.txt

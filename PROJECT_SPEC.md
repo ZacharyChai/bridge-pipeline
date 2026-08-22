@@ -249,6 +249,10 @@ rather than an asset.
 
 ## Phase 8: Orchestration with Dagster, optional
 
+> **Superseded**: this phase shipped with Airflow (LocalExecutor, TaskFlow API), not Dagster --
+> see `DECISIONS.md`'s Phase 8 section for why the reversal. The tasks/acceptance criteria below
+> are the original plan, kept for the record rather than rewritten.
+
 Closes a separate gap (orchestration appears in three of eighteen target postings) and is worth
 doing if the earlier phases land comfortably.
 

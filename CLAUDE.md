@@ -13,7 +13,7 @@ PostgreSQL warehouse, containerized with Docker, covered by pytest and run in Gi
 
 We are rebuilding its transformation layer into a modern analytics engineering stack:
 Snowflake as the warehouse, dbt for transformation and testing, dimensional models in the
-marts layer, orchestrated by Dagster, documented and CI-verified.
+marts layer, orchestrated by Airflow (see Phase 8's row below), documented and CI-verified.
 
 ## Why we are doing it
 
@@ -50,7 +50,7 @@ example.
 | Source | FRED API (and ALFRED for vintages) | Existing ingest code, refactor rather than replace |
 | Warehouse | Snowflake | Trial account. See cost constraints below |
 | Transformation | dbt-core + dbt-snowflake | Not dbt Cloud |
-| Orchestration | Dagster | Phase 8, optional but preferred over Airflow here |
+| Orchestration | Airflow | Phase 8, optional. Originally scoped as Dagster; reversed in favor of Airflow (LocalExecutor, TaskFlow) -- see DECISIONS.md's Phase 8 section for why |
 | Testing | dbt tests + dbt-expectations + existing pytest | Both layers stay |
 | Linting | sqlfluff (Snowflake dialect) | Enforced in CI |
 | CI | GitHub Actions | Extend the existing workflow, do not replace it |

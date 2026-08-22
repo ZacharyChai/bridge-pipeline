@@ -90,6 +90,19 @@ def load_clean(engine: Engine, rows: list[dict]) -> int:
     return len(rows)
 
 
+def read_raw(engine: Engine, series_id: str) -> list[dict]:
+    stmt = text(
+        """
+        SELECT series_id, obs_date AS date, value
+        FROM raw_observations
+        WHERE series_id = :series_id
+        ORDER BY obs_date
+        """
+    )
+    with engine.connect() as conn:
+        return [dict(r._mapping) for r in conn.execute(stmt, {"series_id": series_id})]
+
+
 def read_clean(engine: Engine, series_id: str) -> list[dict]:
     stmt = text(
         """
