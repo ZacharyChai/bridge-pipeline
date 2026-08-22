@@ -118,7 +118,7 @@ jobs:
       - name: Build image and run DAG-integrity tests
         working-directory: orchestration
         run: |
-          docker compose run --rm --entrypoint /bin/bash airflow-scheduler \
+          docker compose --env-file ../.env run --rm --entrypoint /bin/bash airflow-scheduler \
             -c "pytest -q /opt/airflow/bridge-pipeline/orchestration/tests"
 
       - name: Tear down
@@ -169,8 +169,11 @@ jobs:
         id: deployment
 
   build-and-push:
-    # Only after tests pass, and only when landing on main.
-    needs: lint-and-test
+    # Only after tests pass, and only when landing on main. Also needs dag-integrity:
+    # deploy (below) depends on this job, and a DAG that fails to import shouldn't be
+    # able to ride along to a live deploy just because dag-integrity runs in a
+    # separate, non-gating branch of the workflow.
+    needs: [lint-and-test, dag-integrity]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

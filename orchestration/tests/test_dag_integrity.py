@@ -23,6 +23,13 @@ EXPECTED_TASKS = {
     "snowflake_dbt_pipeline": {"ingest_series", "dbt_build"},
 }
 
+# Retries are scoped to each DAG's one genuinely flaky task (the FRED API call) --
+# every other task should fail fast on a deterministic error, not retry it 3x.
+EXPECTED_RETRY_TASKS = {
+    "legacy_postgres_pipeline": {"extract"},
+    "snowflake_dbt_pipeline": {"ingest_series"},
+}
+
 
 def _dagbag() -> DagBag:
     # No include_examples kwarg in Airflow 3's DagBag -- AIRFLOW__CORE__LOAD_EXAMPLES=false
@@ -48,12 +55,24 @@ def test_expected_task_structure():
         assert {t.task_id for t in dag.tasks} == expected_tasks
 
 
-def test_dags_have_retries_and_failure_callback():
+def test_dags_have_failure_callback():
     dagbag = _dagbag()
     for dag_id in EXPECTED_TASKS:
         dag = dagbag.get_dag(dag_id)
         for t in dag.tasks:
-            assert t.retries and t.retries >= 1, f"{dag_id}.{t.task_id} has no retries"
             assert t.on_failure_callback is not None, (
                 f"{dag_id}.{t.task_id} has no on_failure_callback"
             )
+
+
+def test_retries_scoped_to_the_flaky_task_only():
+    dagbag = _dagbag()
+    for dag_id, retry_tasks in EXPECTED_RETRY_TASKS.items():
+        dag = dagbag.get_dag(dag_id)
+        for t in dag.tasks:
+            if t.task_id in retry_tasks:
+                assert t.retries and t.retries >= 1, f"{dag_id}.{t.task_id} should retry"
+            else:
+                assert not t.retries, (
+                    f"{dag_id}.{t.task_id} shouldn't retry a deterministic failure"
+                )

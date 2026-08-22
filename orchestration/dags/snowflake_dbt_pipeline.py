@@ -13,7 +13,7 @@ import subprocess
 
 import pendulum
 from airflow.sdk import dag, task
-from callbacks import log_failure
+from callbacks import DEFAULT_ARGS, RETRY_ARGS, SCHEDULE
 
 log = logging.getLogger("airflow.task")
 
@@ -23,20 +23,14 @@ DBT_PROJECT_DIR = "/opt/airflow/bridge-pipeline/dbt"
 @dag(
     dag_id="snowflake_dbt_pipeline",
     description="FRED/ALFRED vintage ingest -> Snowflake RAW -> dbt build (staging + marts).",
-    schedule="30 6 * * *",
+    schedule=SCHEDULE,
     start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     catchup=False,
     tags=["snowflake", "dbt"],
-    default_args={
-        "retries": 3,
-        "retry_delay": pendulum.duration(minutes=2),
-        "retry_exponential_backoff": True,
-        "max_retry_delay": pendulum.duration(minutes=20),
-        "on_failure_callback": log_failure,
-    },
+    default_args=DEFAULT_ARGS,
 )
 def snowflake_dbt_pipeline():
-    @task
+    @task(**RETRY_ARGS)
     def ingest_series() -> dict[str, int]:
         """All 17 series, one task -- ingest.pipeline_snowflake.run() already aborts the
         whole call if any single series fails to fetch (see its docstring), so retrying

@@ -1,0 +1,9 @@
+# dbt version pins, single source of truth. Referenced by both requirements-dev.txt
+# (local dev / CI) and orchestration/requirements-airflow.txt (the Airflow image) via
+# `-r` so the two environments can't silently drift onto different dbt versions for
+# the same `dbt build` command. Pinned in lockstep on 1.10.x (dbt-duckdb's latest
+# line) to keep the resolver from backtracking across three packages' full version
+# histories.
+dbt-core==1.10.22
+dbt-snowflake==1.10.8
+dbt-duckdb==1.10.1

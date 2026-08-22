@@ -696,6 +696,16 @@ question entirely for its own data: `ingest_series()` returns a small totals dic
 17-series payload itself — that stays inside Snowflake RAW, which is the entire point of
 landing it in a warehouse rather than passing it through the orchestrator.
 
+`legacy_postgres_pipeline` originally didn't follow its own sibling's example here: `extract()`
+returned the full raw FRED payload and `quality_gate()` the full clean/deduplicated dataset,
+both crossing XCom (the metadata Postgres) in full, when `extract()` had already landed the raw
+rows via `load_raw()`. Fixed the same way: `extract()` now returns just a row count, and
+`quality_gate()` re-reads what was just landed via a new `db.read_raw()` (mirroring the existing
+`read_clean()`) instead of receiving it as an argument. The `quality_gate` -> `load` hop still
+passes the clean rows through XCom deliberately -- it's already the smaller, deduplicated,
+validated payload, and `load()` remains a real, separate step (persist what passed the gate)
+rather than folding into `quality_gate()` just to avoid one more XCom hop.
+
 ### The DAG-integrity test runs inside the Airflow container, not the project's own venv
 
 `orchestration/tests/test_dag_integrity.py` uses `DagBag` to assert both DAGs import without
@@ -734,6 +744,34 @@ Airflow image already is.
   (clean) right before the standalone test failed with `ModuleNotFoundError`, which is what
   pointed at the real cause. Fixed with an explicit `sys.path.insert(0, "/opt/airflow/dags")`
   at the top of the test file.
+- **The Airflow apiserver's port was never actually reachable from the host.** `SETUP.md`
+  already documents that Colima's host port-forward is broken on this dev host, which is why
+  `make db-up` opens a manual SSH tunnel (`scripts/db-tunnel.sh`) for Postgres — that same
+  problem applies to any host-published Docker port, including the apiserver's plain
+  `"8080:8080"` mapping, and wasn't caught until a later code review pointed at `SETUP.md`'s own
+  words. Fixed by reusing `db-tunnel.sh` unchanged (it already reads `HOST_PORT`/`GUEST_PORT`
+  from the environment) for port 8080 too, wired into `make airflow-up`/`airflow-down`.
+- **Compose's `${VAR}` substitution and its `env_file:` directive read from different places.**
+  `FERNET_KEY`, `AIRFLOW_UID`, and the `_AIRFLOW_WWW_USER_*` vars are referenced as bare
+  `${VAR}` in the compose YAML — Docker Compose resolves those from the shell environment or a
+  `.env` in the compose project directory, not from `env_file: ../.env`, which only reaches the
+  *containers'* runtime environment after the YAML is already resolved. Every other variable in
+  the same file happens to come from `env_file`, making it a reasonable but wrong assumption
+  that these four would too. Fixed by passing `--env-file ../.env` on every `docker compose`
+  invocation (Makefile and CI), so root `.env` is genuinely the single place to set any of this.
+- **`orchestration/config/` was created and gitignored but never mounted.** The Makefile and
+  `.gitignore` treat it as real Airflow runtime state, mirroring the official compose file's
+  `./config:/opt/airflow/config` mount — that mount line just never made it into the adapted
+  file. Added it.
+
+A few smaller cleanups from the same review, briefly: `legacy_postgres_pipeline.py`'s quality
+bounds (`MIN_ROWS`/`MAX_ROWS`/`MAX_AGE_DAYS`) are now imported from `ingest/pipeline.py` instead
+of re-declared as a second copy that could drift from the bounds it's supposed to match; the
+dbt version pins duplicated across `requirements-dev.txt` and
+`orchestration/requirements-airflow.txt` now live once in `dbt-versions.txt`, referenced by
+both via `-r`; and `build-and-push` (and therefore `deploy`, which depends on it) now also
+`needs: dag-integrity`, so a DAG that fails to import can no longer ride a green
+`lint-and-test` to a live deploy.
 
 ### Verified, not assumed
 
@@ -742,6 +780,15 @@ this project's real Colima runtime, confirmed with zero entries in `airflow dags
 list-import-errors`, unpaused, and triggered for a real run each — `legacy_postgres_pipeline`
 against a real (local, containerized) Postgres, `snowflake_dbt_pipeline` against the same live
 Snowflake account every other phase of this project uses, including a real `dbt build`. The
-DAG-integrity suite (four tests: no import errors, both DAGs present, exact expected task sets,
-every task has retries and a failure callback) was run inside the actual Airflow container, not
-assumed to pass from reading the DAG files.
+DAG-integrity suite (five tests: no import errors, both DAGs present, exact expected task sets,
+every task has a failure callback, and retries land only on each DAG's flaky FRED-API task) was
+run inside the actual Airflow container, not assumed to pass from reading the DAG files.
+
+A later code review caught the first version of this: `default_args` had `retries` set at the
+`@dag` level, which Airflow applies to every task, not just the one it was meant for -- so a
+deterministic `DataQualityError` or a real `dbt build` failure was silently retried 3x (up to
+~15-20 min) before failing, contradicting the design this section describes. Fixed by moving
+retries onto the extract/`ingest_series` task's own `@task(...)` decorator specifically (both
+DAGs now share `RETRY_ARGS`/`DEFAULT_ARGS`/`SCHEDULE` from `callbacks.py` rather than
+copy-pasting them), and split the DAG-integrity test's single retries-and-callback assertion
+into two, so a regression here fails loudly instead of passing on a technicality.

@@ -13,9 +13,6 @@ graphviz>=0.20
 
 # dbt: transformation layer. dbt-core + both adapters, so the project builds
 # against Snowflake (real warehouse) or DuckDB (no-cloud-account fallback)
-# from the same models with just a --target flag. Pinned in lockstep on 1.10.x
-# (dbt-duckdb's latest line) to keep the resolver from backtracking across
-# three packages' full version histories.
-dbt-core==1.10.22
-dbt-snowflake==1.10.8
-dbt-duckdb==1.10.1
+# from the same models with just a --target flag. Pins live in dbt-versions.txt,
+# shared with orchestration/requirements-airflow.txt -- see that file for why.
+-r dbt-versions.txt
