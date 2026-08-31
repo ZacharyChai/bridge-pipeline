@@ -11,9 +11,15 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's own dependency-injection pattern (api/main.py) -- Depends(...)/Query(...) as
+# an argument default isn't the late-binding-mutable-default bug B008 exists to catch.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "integration: exercises a real Postgres warehouse; skipped when none is reachable",
+    "api: exercises the FastAPI app against a real bridge.duckdb build; skipped when the file doesn't exist",
 ]

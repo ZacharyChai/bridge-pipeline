@@ -792,3 +792,69 @@ retries onto the extract/`ingest_series` task's own `@task(...)` decorator speci
 DAGs now share `RETRY_ARGS`/`DEFAULT_ARGS`/`SCHEDULE` from `callbacks.py` rather than
 copy-pasting them), and split the DAG-integrity test's single retries-and-callback assertion
 into two, so a regression here fails loudly instead of passing on a technicality.
+
+## Phase 9: REST API
+
+### Why this phase exists
+
+The project's stated purpose (`CLAUDE.md`) is to demonstrate dbt, a cloud warehouse, and
+dimensional modeling to recruiters. Everything through Phase 8 proves the warehouse is real;
+nothing proved it was *queryable by anything other than dbt itself*. A thin, read-only API
+closes that gap cheaply — it adds no new data, no new pipeline, and no new warehouse, just a
+query layer over the marts that already exist.
+
+### DuckDB's own Python driver, not a third SQLAlchemy engine
+
+`db.py` and `db_snowflake.py` both go through SQLAlchemy Core. `api/db.py` does not — it
+calls `duckdb.connect(..., read_only=True)` directly. Three reasons, not one:
+
+- SQLAlchemy earns its keep in the other two modules because they *write* (idempotent
+  upserts, `ON CONFLICT` clauses, explicit DDL) against server-based warehouses. The API only
+  reads, against a single local file. The abstraction has nothing to buy here.
+- `dbt-duckdb`, the seeds, and everything else that touches `bridge.duckdb` already speaks
+  DuckDB's own dialect. Adding a SQLAlchemy DuckDB dialect on top would be one more
+  translation layer between the API and the exact SQL `dbt build` already runs and tests.
+  The as-of endpoint (below) specifically needs to reproduce a dbt model's SQL closely
+  enough that a reviewer can diff the two — SQLAlchemy Core would obscure that, not help it.
+- One dependency avoided. `requirements.txt`'s own comment calls this "nothing exotic" —
+  a second ORM-adjacent layer for a read-only file query is the kind of addition `CLAUDE.md`
+  asks to flag before making, so it wasn't made.
+
+Connections are opened per request (`api/db.py`'s `get_connection` FastAPI dependency) rather
+than pooled. DuckDB supports multiple concurrent `read_only` connections against one file, so
+this is safe for the traffic this project will ever see (a recruiter or interviewer hitting
+`/docs`), not a claim it would hold under real concurrent write traffic — there is no
+connection pool here to misconfigure, which is the point.
+
+### The as-of endpoint re-derives dbt logic instead of querying the view
+
+`fct_observations_point_in_time` (Phase 4) is a dbt *view*, deliberately, because its answer
+depends on `var("as_of_date", none)` defaulting to `current_date`. The trap: `current_date`
+in the compiled view is a DuckDB/Snowflake SQL function evaluated fresh on every query, not
+a value baked in at `dbt build` time — so simply `SELECT`-ing from that view always means "as
+of right now," no matter what date a caller wants. The dbt *var* that actually parameterizes
+a historical `as_of_date` is a Jinja/compile-time construct (`dbt build --vars`), invisible
+to a running API process; there is no runtime hook into it.
+
+`GET /series/{id}/observations/as-of` therefore re-implements the view's three CTEs (`base`
+/ `filtered` / `ranked`, same names, same `row_number() partition by series_key, date_key
+order by realtime_start_date desc` — see `dbt/models/marts/fct_observations_point_in_time.sql`)
+directly against `fct_observations`, with the caller's `as_of_date` substituted for
+`current_date`. This is intentional duplication, not drift: the two implementations answer
+the same question from the same base fact, and `tests/test_api.py::test_as_of_a_past_date_
+excludes_later_revisions` pins the behavior against the real `COMREPUSQ159N` revision
+`DECISIONS.md`'s Phase 4 entry and the README already document, so the two can't silently
+diverge without a test noticing. The alternative — making the dbt model itself accept a
+runtime parameter — isn't available in dbt's execution model; a view's SQL is fixed at
+compile time.
+
+### Scope, deliberately narrow
+
+Read-only, three routes plus `/health`. No write endpoints, no auth, no rate limiting, no
+Snowflake target for the API (querying the trial warehouse per request would violate
+`CLAUDE.md`'s cost constraints the same way an unmanaged connection pool would) — this is a
+query layer over an existing warehouse, not a new system of record, and `CLAUDE.md`'s rule
+against fabricating data applies here exactly as everywhere else in this project: if
+`bridge.duckdb` doesn't exist yet, `/health` and every DB-backed route say so plainly (via
+`ping()`, mirroring `db.py`'s and `db_snowflake.py`'s own `ping()` functions) rather than
+returning empty lists that look like real "no data" answers.

@@ -1,7 +1,7 @@
 # Bridge Project — task runner.
 # Targets fill in as milestones land; each target notes the milestone that implements it.
 
-.PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix airflow-up airflow-down airflow-logs dag-test
+.PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix airflow-up airflow-down airflow-logs dag-test api-run api-test
 
 # Prefer the project venv if it exists, so targets never fall back to system Python.
 PYTHON := $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
@@ -28,6 +28,12 @@ install:           ## Install runtime + dev dependencies
 
 test:              ## Run the test suite (M1)
 	$(PYTHON) -m pytest -q
+
+api-run:           ## Run the API locally with reload (needs a real bridge.duckdb -- `make dbt-build` first)
+	$(LOAD_ENV) $(PYTHON) -m uvicorn api.main:app --reload
+
+api-test:          ## Run just the API integration tests (Phase 9) (needs a real bridge.duckdb)
+	$(PYTHON) -m pytest -q -m api
 
 lint:              ## Lint with ruff (M3)
 	$(PYTHON) -m ruff check .

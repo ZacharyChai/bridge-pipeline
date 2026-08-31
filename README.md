@@ -9,6 +9,8 @@ standards — ingested with full revision history, modeled in dbt as a proper st
 served through a headline mart built to answer "what were macro conditions for CRE credit at a
 given point in time." Runs on Snowflake; also runs entirely on DuckDB with no cloud account,
 so anyone cloning this repo gets a working build in [under five minutes](#quickstart-duckdb-no-account-needed).
+A small read-only [REST API](#api) sits on top of the marts for querying the warehouse
+programmatically, including point-in-time lookups against an arbitrary past date.
 
 ## Architecture
 
@@ -37,6 +39,10 @@ dbt marts    (star schema)
                         mart_cre_macro_conditions
                         (one row per month, wide, with derived measures)
 ```
+
+A small [FastAPI service](#api) (`api/`) reads dim_series, fct_observations_latest, and
+fct_observations_point_in_time directly -- a read-only query layer over the same DuckDB
+(or Snowflake) file, not a separate pipeline.
 
 Full lineage graph, generated straight from the dbt DAG:
 
@@ -129,14 +135,15 @@ run against Snowflake (`dbt seed`'s raw-table targets are disabled there — see
 ## Stack
 
 Python 3.13 · dbt-core + dbt-snowflake + dbt-duckdb · Snowflake · DuckDB · dbt_utils ·
-dbt-expectations · Airflow (LocalExecutor, TaskFlow API) · sqlfluff · pytest · ruff ·
-GitHub Actions · Postgres 16 (legacy path) · Docker · Terraform · cron · Uptime Kuma.
+dbt-expectations · Airflow (LocalExecutor, TaskFlow API) · FastAPI + uvicorn · sqlfluff ·
+pytest · ruff · GitHub Actions · Postgres 16 (legacy path) · Docker · Terraform · cron ·
+Uptime Kuma.
 
 ## Testing & CI
 
 ```bash
-make test              # pytest — unit tests need no DB; both integration suites skip
-                        # gracefully if Postgres/Snowflake aren't reachable
+make test              # pytest — unit tests need no DB; integration suites (Postgres,
+                        # Snowflake, and the API) all skip gracefully if unreachable
 make lint               # ruff check + format
 make sqlfluff-lint       # SQL lint, Snowflake dialect
 make dbt-build           # dbt build (all tests) — duckdb by default, TARGET=snowflake to switch
@@ -158,6 +165,43 @@ container), `dbt build` + `dbt source freshness` against an isolated Snowflake s
 created and torn down per pull request — and a DAG-integrity job (both DAGs import cleanly,
 have the expected tasks, retries, and failure callback) on every PR. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+## API
+
+A small, read-only FastAPI service (`api/`) over the same warehouse — for a recruiter or
+interviewer to poke at with `curl` or `/docs`, not a second system of record. It queries
+`dim_series`, `fct_observations_latest`, and `fct_observations_point_in_time` directly
+against whichever DuckDB (or Snowflake) file `make dbt-build` last produced; it writes
+nothing.
+
+```bash
+make dbt-build          # first, so bridge.duckdb actually has data
+make api-run             # http://localhost:8000/docs (interactive Swagger UI)
+```
+
+| Endpoint | What it returns |
+|---|---|
+| `GET /series` | The 17-series catalog (`?category=` to filter) |
+| `GET /series/{series_id}` | One series' metadata, 404 if unknown |
+| `GET /series/{series_id}/observations` | Best-known values, `?start_date=`/`?end_date=` |
+| `GET /series/{series_id}/observations/as-of` | Point-in-time reconstruction as of `?as_of_date=` |
+| `GET /health` | Liveness check against the DuckDB/Snowflake connection |
+
+The `as-of` endpoint is the one worth reading the code for: `fct_observations_point_in_time`
+(the dbt view) always answers "as of right now," because `current_date` there is a SQL
+function evaluated at query time, not the compile-time `as_of_date` dbt var — so the API
+re-derives that model's row-ranking logic directly against `fct_observations` (the fact
+table that keeps every revision) with the caller's date substituted in. See
+[`DECISIONS.md`](DECISIONS.md#phase-9-rest-api) for the full writeup, including why this
+queries DuckDB directly instead of adding a third SQLAlchemy engine alongside `db.py` and
+`db_snowflake.py`.
+
+```bash
+make api-test            # 12 integration tests against a real bridge.duckdb build
+```
+
+Not yet wired into `.github/workflows/ci.yml` — CI covers the dbt/Postgres/Snowflake paths
+described above; the API tests currently run locally only.
 
 ## Documentation
 
@@ -209,10 +253,15 @@ Local dev instructions for this path: [`SETUP.md`](SETUP.md).
 | Phase 6 — CI and documentation | done |
 | Phase 7 — decisions record ([`DECISIONS.md`](DECISIONS.md)), interview notes ([`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md)) | done |
 | Phase 8 — Airflow orchestration ([`orchestration/`](orchestration/)) | done |
+| Phase 9 — [REST API](#api) (`api/`) | done |
 
 ## Repository layout
 
 ```
+api/                              Phase 9: read-only FastAPI service over the marts
+  main.py                          routes
+  db.py                            DuckDB connection (read-only, request-scoped)
+  schemas.py                       pydantic response models
 ingest/                          FRED/ALFRED ingest
   fred.py                          HTTP client — legacy single-series + Phase 2 vintage-aware fetch
   series.py                        curated 17-series catalog
@@ -240,6 +289,6 @@ AUDIT.md                          Phase 0 audit of the pre-rebuild repo
 DECISIONS.md                      design decisions, by phase
 INTERVIEW_NOTES.md                spoken-register companion to DECISIONS.md
 Dockerfile, docker-compose.yml    legacy local dev image + stack
-Makefile                          test/lint/dbt-*/sqlfluff-* targets
+Makefile                          test/lint/dbt-*/sqlfluff-*/api-* targets
 SETUP.md                          legacy local-dev setup walkthrough
 ```

@@ -89,3 +89,26 @@ def load_snowflake_settings() -> SnowflakeSettings:
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "BRIDGE_WH"),
         database=os.environ.get("SNOWFLAKE_DATABASE", "BRIDGE_DB"),
     )
+
+
+@dataclass(frozen=True)
+class ApiSettings:
+    """Read-only connection settings for the api/ service (Phase 9).
+
+    Points at the same DuckDB file dbt builds (see dbt/profiles.yml's duckdb output) --
+    reuses DBT_DUCKDB_PATH rather than inventing a second variable for one file, the same
+    reasoning load_snowflake_settings() gives for reusing SNOWFLAKE_* vars below. The API
+    never queries Snowflake directly: spinning up the trial warehouse per request isn't
+    something this project's cost constraints (see CLAUDE.md) can carry, and DuckDB is the
+    artifact every clone of this repo already has after `make dbt-build`.
+    """
+
+    duckdb_path: str
+
+
+def load_api_settings() -> ApiSettings:
+    """Load .env (if present) then read API settings from the environment."""
+    load_dotenv()
+    return ApiSettings(
+        duckdb_path=os.environ.get("DBT_DUCKDB_PATH", "bridge.duckdb"),
+    )

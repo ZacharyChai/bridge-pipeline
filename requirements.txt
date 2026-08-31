@@ -8,3 +8,10 @@ python-dotenv>=1.0
 # verified end to end — see AUDIT.md and CLAUDE.md's "don't delete the Postgres path
 # in one pass" rule.
 snowflake-sqlalchemy>=1.6
+
+# REST API (Phase 9) -- read-only endpoints over the dbt marts, queried directly against
+# the same DuckDB file dbt already builds. No new warehouse client: duckdb's own Python
+# driver, same "nothing exotic" philosophy as the rest of this file.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+duckdb>=1.1
