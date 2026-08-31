@@ -83,7 +83,7 @@ def list_series(
 ) -> list[Series]:
     rows = con.execute(
         f"""
-        select {', '.join(_SERIES_COLUMNS)}
+        select {", ".join(_SERIES_COLUMNS)}
         from dim_series
         where (? is null or category = ?)
         order by series_id
@@ -94,9 +94,7 @@ def list_series(
 
 
 @app.get("/series/{series_id}", response_model=Series)
-def get_series(
-    series_id: str, con: duckdb.DuckDBPyConnection = Depends(get_connection)
-) -> Series:
+def get_series(series_id: str, con: duckdb.DuckDBPyConnection = Depends(get_connection)) -> Series:
     return _get_series_or_404(con, series_id)
 
 
