@@ -200,8 +200,10 @@ queries DuckDB directly instead of adding a third SQLAlchemy engine alongside `d
 make api-test            # 12 integration tests against a real bridge.duckdb build
 ```
 
-Not yet wired into `.github/workflows/ci.yml` — CI covers the dbt/Postgres/Snowflake paths
-described above; the API tests currently run locally only.
+`tests/test_api.py` runs as part of the standard `pytest -q` in CI too (same as the Postgres
+and Snowflake integration suites) — it just always skips there, since `lint-and-test` never
+runs `make dbt-build` first. They only actually execute, against a real warehouse, locally
+or in any job that builds `bridge.duckdb` before testing.
 
 ## Documentation
 
