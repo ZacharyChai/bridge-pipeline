@@ -163,7 +163,9 @@ flagged, not blocking the build).
 GitHub Actions runs ruff, sqlfluff, the full pytest suite (against a real Postgres service
 container), `dbt build` + `dbt source freshness` against an isolated Snowflake schema —
 created and torn down per pull request — and a DAG-integrity job (both DAGs import cleanly,
-have the expected tasks, retries, and failure callback) on every PR. See
+have the expected tasks, retries, and failure callback) on every PR. `build-and-push` and
+`deploy` both require `dag-integrity` to pass, not just `lint-and-test` — a broken DAG blocks
+the image build and the live deploy, not just a red check on the PR. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## API
@@ -290,6 +292,7 @@ docs/                             lineage.png
 AUDIT.md                          Phase 0 audit of the pre-rebuild repo
 DECISIONS.md                      design decisions, by phase
 INTERVIEW_NOTES.md                spoken-register companion to DECISIONS.md
+dbt-versions.txt                  single source of truth for dbt version pins
 Dockerfile, docker-compose.yml    legacy local dev image + stack
 Makefile                          test/lint/dbt-*/sqlfluff-*/api-* targets
 SETUP.md                          legacy local-dev setup walkthrough
