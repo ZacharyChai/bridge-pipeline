@@ -40,7 +40,7 @@ underwriting question is a usable tool. Do not flatten it into a generic example
 | Layer | Tool | Notes |
 |---|---|---|
 | Source | FRED API (and ALFRED for vintages) | Existing ingest code, refactor rather than replace |
-| Warehouse | Snowflake | Trial account. See cost constraints below |
+| Warehouse | Snowflake, with DuckDB as the local and CI target | The Snowflake account was a time-limited trial; DuckDB is what CI and the quickstart run. See cost constraints below |
 | Transformation | dbt-core + dbt-snowflake | Not dbt Cloud |
 | Orchestration | Airflow | Phase 8, optional. Originally scoped as Dagster; reversed in favor of Airflow (LocalExecutor, TaskFlow) -- see DECISIONS.md's Phase 8 section for why |
 | Testing | dbt tests + dbt-expectations + existing pytest | Both layers stay |
@@ -53,12 +53,12 @@ defensible.
 
 ## Cost constraints, non-negotiable
 
-- Snowflake trial is time-limited and credit-limited. Use an **XS warehouse**, set
+- Snowflake was a time-limited, credit-limited trial. Whenever it is on: an **XS warehouse**,
   `AUTO_SUSPEND = 60` seconds, and never leave a warehouse running.
 - Do not ingest the full FRED catalog. A curated set of roughly 15 to 25 series is more than
   enough to demonstrate the modeling, and a bloated warehouse demonstrates nothing extra.
-- Keep the **DuckDB fallback profile** working so the project still runs after the trial
-  expires. A portfolio repo a recruiter cannot run is a dead portfolio repo.
+- The **DuckDB profile** is the one that has to keep working: it is what CI builds and what
+  anyone cloning the repo runs. A portfolio repo a recruiter cannot run is a dead portfolio repo.
 
 ## Secrets
 

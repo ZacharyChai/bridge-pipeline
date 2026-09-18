@@ -1,6 +1,6 @@
 """M1 (red-first): data-quality checks.
 
-The brief's required checks: no nulls in keys, row count in an expected range,
+The original plan's required checks: no nulls in keys, row count in an expected range,
 no duplicate primary keys, values are numeric, and data is fresh. Each check
 raises DataQualityError on violation; run_all_checks runs them together.
 """

@@ -33,7 +33,7 @@ bridge-pipeline/
 ```
 
 `infra/` and `deploy/` are artifacts of a prior project (the "Bridge Project" containerized-pipeline
-brief, M0–M6, completed 2026-07-15): a hardened GCE `e2-micro` VM at a static IP runs this stack
+plan, M0–M6, completed 2026-07-15): a hardened GCE `e2-micro` VM at a static IP runs this stack
 today via a daily cron job, with Uptime Kuma monitoring and nightly `pg_dump` backups. That box is
 still live and still pulling FRED data daily — it is out of scope for this audit but relevant
 context: it currently depends on `deploy/docker-compose.prod.yml`, which points at the Postgres
@@ -205,7 +205,7 @@ left unaddressed. Longer term, keeping build directories like `.venv`, `dbt_pack
   for this logic should not be deleted (they're evidence of prior TDD work); the equivalent
   logic should be reimplemented in dbt staging models and the FRED `"."`-marker handling
   decision re-documented in `DECISIONS.md` at that point, since it's the same "obvious to miss"
-  detail the original brief called out.
+  detail the original plan called out.
 - `db.py`'s Postgres schema/upsert functions — superseded by Snowflake `RAW` tables once Phase 2
   is verified end to end. Per `CONVENTIONS.md`, the Postgres path stays working in parallel until
   then, then gets removed in one single reviewable commit — it is not being removed in this

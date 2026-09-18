@@ -28,7 +28,7 @@ the live GCE cron entry stays put, idempotent backfills, real bugs hit standing 
 
 ### Why Snowflake over BigQuery or Redshift
 
-Snowflake was the brief's default and is kept for three reasons specific to this project's goal
+Snowflake was the original plan's default and is kept for three reasons specific to this project's goal
 (a portfolio piece for AE/data-analyst roles, not a production system):
 
 - **Warehouse-native dbt story.** Snowflake's separation of storage and compute, and its
@@ -312,7 +312,7 @@ phase builds, each answering a different question:
   when not supplied). For each `(series_key, date_key)`, the single vintage whose
   `[realtime_start_date, realtime_end_date)` window covers the as-of date. This is the object
   that answers "what did we believe X was, as of some past date" — the actual point-in-time
-  query the brief asks for, not just a description of one.
+  query the original plan asks for, not just a description of one.
 - **`dim_series`** — grain: one row per FRED series (`series_key` ~ `series_id`).
 - **`dim_date`** — grain: one row per calendar date across the full observation range.
 - **`mart_cre_macro_conditions`** — grain: **one row per calendar month.** (Rationale for
@@ -335,7 +335,7 @@ join for the sake of looking normalized.
 
 ### SCD Type 2 approach, and what was rejected
 
-The brief calls this "the single most interesting modeling problem in the project," and the
+The original plan called this "the single most interesting modeling problem in the project," and the
 approach here is deliberately not a textbook Type 2 dimension (no `dim_series` row versioning
 — series metadata like title/units doesn't get revised the way observation values do). The
 revision problem here is on the **fact**, not a dimension: the same `(series, obs_date)` gets
@@ -351,7 +351,7 @@ uniformly for both true multi-vintage series and the current-value-only ones fro
 since the latter always have exactly one row to "rank") and `fct_observations_point_in_time`
 (same ranking, but filtered to vintages whose `realtime_start_date <= as_of_date` first).
 
-**Rejected: keeping only latest values.** This is explicitly what the brief says not to do, and
+**Rejected: keeping only latest values.** This is explicitly what the original plan said not to do, and
 for good reason — it would make `fct_observations` structurally incapable of answering "what
 did we know then," which is the entire point of ingesting ALFRED vintages in Phase 2 in the
 first place. Would have saved nothing at query time either; `fct_observations_latest` already

@@ -62,12 +62,45 @@ jobs:
           sqlfluff lint models/ tests/
 
   dbt-build:
-    # Builds staging + marts into an isolated, per-run Snowflake schema, reading real data
-    # from the production RAW schema (populated separately by ingest/pipeline_snowflake.py —
-    # this job never ingests). Torn down afterward regardless of outcome. Runs after
-    # lint-and-test passes, not in parallel — no reason to spend Snowflake credits on a
-    # build that's already known-broken by a lint or unit-test failure.
+    # Seeds the DuckDB fixture and runs the full dbt build (every model, all tests) on every
+    # PR, then runs the API integration tests against the file it just built. No cloud
+    # account involved, so this job never depends on a secret. The Snowflake variant below
+    # is the same build against the real warehouse, opt-in via a repository variable so the
+    # default CI run needs no cloud account.
     needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: dbt deps
+        run: dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: dbt seed (DuckDB fixture)
+        run: dbt seed --project-dir dbt --profiles-dir dbt --target duckdb
+
+      - name: dbt build (target=duckdb)
+        run: dbt build --project-dir dbt --profiles-dir dbt --target duckdb
+
+      - name: API integration tests against the build
+        run: python -m pytest -q -m api
+
+  dbt-build-snowflake:
+    # The same build against the real warehouse: staging + marts into an isolated, per-run
+    # Snowflake schema, reading real data from the production RAW schema (populated
+    # separately by ingest/pipeline_snowflake.py; this job never ingests), torn down
+    # afterward regardless of outcome. Opt-in, since the Snowflake account was a time-limited
+    # trial and the default CI run stays on DuckDB: set SNOWFLAKE_CI_ENABLED=true and the
+    # three SNOWFLAKE_* secrets to run it.
+    needs: lint-and-test
+    if: vars.SNOWFLAKE_CI_ENABLED == 'true'
     runs-on: ubuntu-latest
     env:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -93,7 +126,7 @@ jobs:
 
       - name: dbt source freshness
         run: dbt source freshness --project-dir dbt --profiles-dir dbt --target snowflake
-        continue-on-error: true # freshness is informational here — see DECISIONS.md's warn_after/error_after config
+        continue-on-error: true # freshness is informational here; see DECISIONS.md's warn_after/error_after config
 
       - name: Tear down CI schema
         if: always() # cleanup must run even if the build/tests above failed

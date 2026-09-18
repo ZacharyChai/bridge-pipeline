@@ -7,7 +7,7 @@ A dimensional data warehouse for commercial real estate credit conditions: 17 cu
 the Treasury curve, inflation, labor, commercial property prices, and bank lending
 standards — ingested with full revision history, modeled in dbt as a proper star schema, and
 served through a headline mart built to answer "what were macro conditions for CRE credit at a
-given point in time." Runs on Snowflake; also runs entirely on DuckDB with no cloud account,
+given point in time." Built and verified on Snowflake; runs entirely on DuckDB with no cloud account,
 so anyone cloning this repo gets a working build in [under five minutes](#quickstart-duckdb-no-account-needed).
 A small read-only [REST API](#api) sits on top of the marts for querying the warehouse
 programmatically, including point-in-time lookups against an arbitrary past date.
@@ -161,9 +161,12 @@ COVID labor-market shock, exactly as intended — a genuine historical extreme, 
 flagged, not blocking the build).
 
 GitHub Actions runs ruff, sqlfluff, the full pytest suite (against a real Postgres service
-container), `dbt build` + `dbt source freshness` against an isolated Snowflake schema —
-created and torn down per pull request — and a DAG-integrity job (both DAGs import cleanly,
-have the expected tasks, retries, and failure callback) on every PR. `build-and-push` and
+container), the full `dbt build` on DuckDB (every model, all 80 tests, then the 12 API
+integration tests against the file it just built), and a DAG-integrity job (both DAGs
+import cleanly, have the expected tasks, retries, and failure callback) on every PR. The
+same build against Snowflake, into an isolated per-run schema torn down afterward, is a
+separate opt-in job (`SNOWFLAKE_CI_ENABLED=true` plus the account secrets), so the default
+CI run needs no cloud account. `build-and-push` and
 `deploy` both require `dag-integrity` to pass, not just `lint-and-test` — a broken DAG blocks
 the image build and the live deploy, not just a red check on the PR. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
@@ -202,10 +205,9 @@ queries DuckDB directly instead of adding a third SQLAlchemy engine alongside `d
 make api-test            # 12 integration tests against a real bridge.duckdb build
 ```
 
-`tests/test_api.py` runs as part of the standard `pytest -q` in CI too (same as the Postgres
-and Snowflake integration suites) — it just always skips there, since `lint-and-test` never
-runs `make dbt-build` first. They only actually execute, against a real warehouse, locally
-or in any job that builds `bridge.duckdb` before testing.
+`tests/test_api.py` skips itself when no `bridge.duckdb` exists, so it is a no-op inside
+`lint-and-test`; the `dbt-build` job runs it for real, against the DuckDB file it has just
+built, on every PR. Locally, `make dbt-build` then `make api-test` does the same.
 
 ## Documentation
 

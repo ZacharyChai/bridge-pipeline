@@ -67,7 +67,7 @@ it with a second loader that keys those series on (series, date) alone, and wrot
 test that simulates the day-change directly instead of waiting two real days to catch it again.
 
 **3. Getting the CI isolation actually right, not just configured right.**
-The brief wanted CI to build into an isolated schema per run and tear it down. It would have
+The original plan wanted CI to build into an isolated schema per run and tear it down. It would have
 been easy to write that YAML and call it done. Instead I built into a real Snowflake schema by
 hand first, confirmed with `SHOW SCHEMAS` that it existed, ran the exact teardown command CI
 would run, and confirmed the schema was actually gone — before that logic ever touched GitHub
@@ -86,7 +86,7 @@ back at what the macro backdrop looked like when a comp deal closed, you want th
 was known *then*, not the number as it reads today after two years of revisions.
 
 **"Why Snowflake and not just Postgres, given you already had a working Postgres pipeline?"**
-Two separate reasons. First, the brief: this project exists to demonstrate a cloud-warehouse
+Two separate reasons. First, the purpose: this project exists to demonstrate a cloud-warehouse
 skill Postgres doesn't show. Second, practically: Snowflake's the more common ask in the roles
 I'm targeting, and the DuckDB fallback means the choice doesn't cost the project portability —
 anyone can clone it and run the same models with zero cloud account.
