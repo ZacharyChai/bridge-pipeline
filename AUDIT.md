@@ -200,14 +200,14 @@ left unaddressed. Longer term, keeping build directories like `.venv`, `dbt_pack
 
 - `transform/transform.py` and `transform/quality.py`'s *production code path* — once ingest
   lands genuinely raw data in Snowflake `RAW` (per Phase 2/3's "raw means raw" rule) and dbt
-  staging models do the casting/cleaning in SQL (per the `stg_` convention in `CLAUDE.md`), the
+  staging models do the casting/cleaning in SQL (per the `stg_` convention in `CONVENTIONS.md`), the
   Python-side cleaning step is redundant for the new pipeline. Per project rules the *tests*
   for this logic should not be deleted (they're evidence of prior TDD work); the equivalent
   logic should be reimplemented in dbt staging models and the FRED `"."`-marker handling
   decision re-documented in `DECISIONS.md` at that point, since it's the same "obvious to miss"
   detail the original brief called out.
 - `db.py`'s Postgres schema/upsert functions — superseded by Snowflake `RAW` tables once Phase 2
-  is verified end to end. Per `CLAUDE.md`, the Postgres path stays working in parallel until
+  is verified end to end. Per `CONVENTIONS.md`, the Postgres path stays working in parallel until
   then, then gets removed in one single reviewable commit — it is not being removed in this
   phase.
 

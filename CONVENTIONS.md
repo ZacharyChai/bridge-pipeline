@@ -1,45 +1,37 @@
-# CLAUDE.md
+# Project conventions
 
-Project conventions and constraints for `bridge-pipeline`. Read this before doing anything. If
-an instruction here conflicts with a general best practice you would otherwise apply, this file
-wins.
+Conventions and constraints for `bridge-pipeline`. Where these conflict with a general best
+practice, these win, and the reason is written down in `DECISIONS.md`.
 
 ---
 
 ## What this project is
 
-`bridge-pipeline` currently ingests Federal Reserve (FRED) macroeconomic time series into a
-PostgreSQL warehouse, containerized with Docker, covered by pytest and run in GitHub Actions CI.
+`bridge-pipeline` ingests Federal Reserve (FRED and ALFRED) macroeconomic time series with full
+revision history and models them in dbt as a dimensional warehouse for commercial real estate
+credit conditions: Snowflake as the warehouse, DuckDB as a no-account local build, dbt for
+transformation and testing, Airflow for orchestration, a read-only FastAPI layer on top, all
+documented and CI-verified. The original single-series Postgres path is kept running alongside
+it (see the README's legacy section).
 
-We are rebuilding its transformation layer into a modern analytics engineering stack:
-Snowflake as the warehouse, dbt for transformation and testing, dimensional models in the
-marts layer, orchestrated by Airflow (see Phase 8's row below), documented and CI-verified.
+## What it is for
 
-## Why we are doing it
-
-This is a portfolio artifact for a job search targeting US analytics engineering and data
-analyst roles. It exists to demonstrate three specific competencies that recruiters screen for
-and that the current repo does not evidence: dbt, a cloud data warehouse, and dimensional
-modeling.
-
-Two consequences follow from that, and they matter more than they might seem:
+It is a portfolio project, built to demonstrate dbt, a cloud data warehouse and dimensional
+modeling on a real underwriting question. Two consequences follow:
 
 1. **The modeling decisions are the product.** A working pipeline that makes unexplained
-   choices is worth less here than a slightly simpler one whose grain, keys, and SCD handling
-   are deliberate and documented. Optimize for defensibility, not cleverness.
-2. **The owner must be able to explain every line in an interview.** Where you make a
-   non-obvious choice, write down the alternative you rejected and why. Phase 7 depends on this.
+   choices is worth less than a slightly simpler one whose grain, keys and SCD handling are
+   deliberate and documented. Optimize for defensibility, not cleverness.
+2. **Every line has to be explainable.** Where a choice is non-obvious, the alternative that was
+   rejected, and why, goes in `DECISIONS.md`.
 
 ## Domain angle: this is not a generic macro warehouse
 
-The owner's background is commercial real estate and CMBS credit. The marts layer must serve a
-**CRE underwriting context**, not generic macro reporting. Concretely: the headline mart answers
-"what were macro conditions for CRE credit at a given point in time," combining Treasury yields
-and the curve, CPI, unemployment, and commercial property price indices.
-
-This is a deliberate differentiator. A generic FRED warehouse is a tutorial. One that serves a
-domain the owner can speak to fluently is an interview asset. Do not flatten it into a generic
-example.
+The marts layer serves a **CRE underwriting context**, not generic macro reporting. Concretely:
+the headline mart answers "what were macro conditions for CRE credit at a given point in time,"
+combining Treasury yields and the curve, CPI, unemployment, commercial property price indices
+and bank lending standards. A generic FRED warehouse is a tutorial; one built around a specific
+underwriting question is a usable tool. Do not flatten it into a generic example.
 
 ---
 
@@ -56,8 +48,8 @@ example.
 | CI | GitHub Actions | Extend the existing workflow, do not replace it |
 | Containerization | Docker | Already present, keep it working |
 
-Do not introduce additional tools without flagging it first. Every extra dependency is another
-thing the owner has to defend in an interview.
+Do not add tools without a `DECISIONS.md` entry saying why. Every extra dependency has to be
+defensible.
 
 ## Cost constraints, non-negotiable
 
@@ -65,15 +57,15 @@ thing the owner has to defend in an interview.
   `AUTO_SUSPEND = 60` seconds, and never leave a warehouse running.
 - Do not ingest the full FRED catalog. A curated set of roughly 15 to 25 series is more than
   enough to demonstrate the modeling, and a bloated warehouse demonstrates nothing extra.
-- Build a **DuckDB fallback profile** in Phase 1 so the project still runs after the trial
+- Keep the **DuckDB fallback profile** working so the project still runs after the trial
   expires. A portfolio repo a recruiter cannot run is a dead portfolio repo.
 
 ## Secrets
 
 Never commit credentials. Snowflake connection details and the FRED API key come from
-environment variables, referenced in `profiles.yml` via `env_var()`. Add a
-`.env.example` with the variable names and no values. Verify `.gitignore` covers `.env`,
-`profiles.yml` if it holds anything real, and `target/`, `dbt_packages/`, `logs/`.
+environment variables, referenced in `profiles.yml` via `env_var()`. `.env.example` carries
+the variable names and no values. `.gitignore` covers `.env`, `profiles.yml` if it holds
+anything real, and `target/`, `dbt_packages/`, `logs/`.
 
 ---
 
@@ -111,13 +103,12 @@ environment variables, referenced in `profiles.yml` via `env_var()`. Add a
 
 ## Definition of done, applies to every phase
 
-A phase is not complete until all of the following are true. Do not report a phase as finished
-otherwise, and do not proceed to the next one.
+A phase is not complete until all of the following are true.
 
 1. `dbt build` runs clean: models materialize, all tests pass.
 2. `sqlfluff lint models/` returns no violations.
 3. The existing pytest suite still passes. If a refactor broke a test, fix the code or update
-   the test deliberately and say which you did.
+   the test deliberately, and record which in `DECISIONS.md`.
 4. Every new model has a `.yml` entry with a description, and every column has a description.
    An undocumented column is an incomplete model.
 5. The GitHub Actions workflow is green.
@@ -135,11 +126,10 @@ otherwise, and do not proceed to the next one.
 - Do not commit `target/`, `logs/`, or `dbt_packages/`.
 - Do not add a README section claiming a capability the repo does not have.
 
-## Commit and communication style
+## Commit style
 
 - Small, single-purpose commits. Conventional-commit prefixes (`feat:`, `fix:`, `refactor:`,
   `docs:`, `test:`, `chore:`).
 - One commit should not span two phases.
-- When you finish a phase, report: what changed, what you decided and why, what you deferred,
-  and anything you are uncertain about. Flag uncertainty explicitly rather than presenting a
-  guess as settled.
+- Each phase closes with a `DECISIONS.md` entry: what changed, what was decided and why, what
+  was deferred, and what is still uncertain. Uncertainty is flagged, not presented as settled.

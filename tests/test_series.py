@@ -2,7 +2,7 @@
 
 Not testing FRED itself (that happened once, live, while curating the list — see
 DECISIONS.md) — just guarding against catalog mistakes: duplicates, an empty group,
-or drifting outside the 15-25 series budget CLAUDE.md sets.
+or drifting outside the 15-25 series budget CONVENTIONS.md sets.
 """
 
 from ingest.series import SERIES, SERIES_IDS

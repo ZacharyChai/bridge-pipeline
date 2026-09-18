@@ -99,7 +99,7 @@ class ApiSettings:
     reuses DBT_DUCKDB_PATH rather than inventing a second variable for one file, the same
     reasoning load_snowflake_settings() gives for reusing SNOWFLAKE_* vars below. The API
     never queries Snowflake directly: spinning up the trial warehouse per request isn't
-    something this project's cost constraints (see CLAUDE.md) can carry, and DuckDB is the
+    something this project's cost constraints (see CONVENTIONS.md) can carry, and DuckDB is the
     artifact every clone of this repo already has after `make dbt-build`.
     """
 

@@ -41,7 +41,7 @@ def test_list_series_returns_the_curated_catalog(client):
     resp = client.get("/series")
     assert resp.status_code == 200
     body = resp.json()
-    # CLAUDE.md's cost constraints cap the curated catalog at 15-25 series -- see
+    # CONVENTIONS.md's cost constraints cap the curated catalog at 15-25 series -- see
     # tests/test_series.py's test_series_count_within_budget for the same bound on the
     # ingest-side catalog this mart is built from.
     assert 15 <= len(body) <= 25

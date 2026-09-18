@@ -290,6 +290,7 @@ tests/                            pytest suite — ingest, transform, quality, b
 docs/                             lineage.png
 .github/                          CI workflow
 AUDIT.md                          Phase 0 audit of the pre-rebuild repo
+CONVENTIONS.md                    naming, SQL style, cost constraints, definition of done
 DECISIONS.md                      design decisions, by phase
 INTERVIEW_NOTES.md                spoken-register companion to DECISIONS.md
 dbt-versions.txt                  single source of truth for dbt version pins

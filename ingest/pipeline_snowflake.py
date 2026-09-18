@@ -2,7 +2,7 @@
 
 Run with `python -m ingest.pipeline_snowflake` (or `make run-snowflake`). Separate from
 ingest/pipeline.py (the legacy single-series Postgres path), which keeps running unchanged
-until this path is verified end to end — see CLAUDE.md's rule against deleting the Postgres
+until this path is verified end to end — see CONVENTIONS.md's rule against deleting the Postgres
 path in one pass.
 
 Unlike the legacy pipeline, there is no data-quality gate here: RAW is deliberately

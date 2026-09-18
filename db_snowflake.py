@@ -1,7 +1,7 @@
 """Snowflake RAW-layer access: schema, idempotent loads.
 
 Mirrors db.py's shape deliberately (SQLAlchemy Core, explicit DDL, idempotent loads) so the two
-warehouses are easy to compare while both are live — see AUDIT.md and CLAUDE.md's rule against
+warehouses are easy to compare while both are live — see AUDIT.md and CONVENTIONS.md's rule against
 deleting the Postgres path in one pass.
 
 Everything here lands in RAW, verbatim: obs_date/value/realtime_start/realtime_end all stay

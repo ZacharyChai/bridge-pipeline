@@ -1,4 +1,4 @@
-# Snowflake dialect (per CLAUDE.md's stack table) — even though local dev/CI usually run dbt
+# Snowflake dialect (per CONVENTIONS.md's stack table) — even though local dev/CI usually run dbt
 # against the duckdb target, lint is about SQL style, not adapter, so one dialect is enough.
 # Uses the dbt templater so Jinja (ref/source macros) resolves before linting; that needs a
 # working dbt env, hence target=duckdb (no cloud account required to just compile+lint).
@@ -18,9 +18,9 @@ line_position = trailing
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = lower
 
-# `value` is a reserved word in Snowflake but is CLAUDE.md's one deliberate exception to
+# `value` is a reserved word in Snowflake but is CONVENTIONS.md's one deliberate exception to
 # "never a meaningless column name" — it's genuinely the measure on the observation fact.
 # Renaming it to dodge the reserved-word rule would be exactly the kind of pointless
-# indirection CLAUDE.md is trying to avoid.
+# indirection CONVENTIONS.md is trying to avoid.
 [sqlfluff:rules:references.keywords]
 ignore_words = value

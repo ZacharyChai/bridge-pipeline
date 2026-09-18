@@ -119,11 +119,11 @@ history; the resulting catalog:
 | Credit conditions (SLOOS) | `SUBLPDRCSC`, `SUBLPDRCSN`, `SUBLPDRCSM` | Bank tightening standards, split by CRE loan purpose (construction/land, nonfarm nonresidential, multifamily) — this granularity beats the single discontinued `DRTSCREL` series it replaces |
 | Credit conditions (delinquency) | `DRCRELEXFACBS`, `DRCRELEXFT100S` | CRE delinquency, all banks vs. top-100 banks by assets — lets the mart show concentration risk, not just an aggregate |
 
-17 sits in the middle of the 15-25 budget CLAUDE.md sets. Rejected additions: `T10Y2Y` (FRED's
+17 sits in the middle of the 15-25 budget CONVENTIONS.md sets. Rejected additions: `T10Y2Y` (FRED's
 own precomputed 10Y-2Y spread) — the mart is supposed to *derive* that spread from the raw
 curve points in Phase 4, so ingesting FRED's precomputed version would undercut the point of
 that exercise. `MORTGAGE30US` and other residential-market series — explicitly out of scope
-per CLAUDE.md's "not a generic macro warehouse" instruction.
+per CONVENTIONS.md's "not a generic macro warehouse" instruction.
 
 ### Why vintages are preserved — and where they aren't
 
@@ -136,7 +136,7 @@ in the specified real-time period... This exceeds the maximum (2000)."* Fetching
 (paginated, via the `/fred/series/vintagedates` + `vintage_dates=` parameter) confirmed why:
 the value at `1962-01-02` is `4.06` in every single one of those 5080 vintages — it was never
 actually revised, FRED just periodically re-issues the whole file. Chasing that "history" would
-mean ~725,000 near-duplicate rows for one series alone, directly against CLAUDE.md's "a bloated
+mean ~725,000 near-duplicate rows for one series alone, directly against CONVENTIONS.md's "a bloated
 warehouse demonstrates nothing extra" instruction, and against the Phase 1 Snowflake cost
 budget.
 
@@ -272,7 +272,7 @@ out of sync with what the real ingest actually returns.
 
 ### The realtime_start/realtime_end naming exception
 
-CLAUDE.md's naming convention says dates get a `_date` suffix. `stg_observations` renames
+CONVENTIONS.md's naming convention says dates get a `_date` suffix. `stg_observations` renames
 `realtime_start`/`realtime_end` (raw FRED field names) to `realtime_start_date`/
 `realtime_end_date` — applied uniformly rather than carved out as an exception, on the
 reasoning that a consistent, literally-followed convention is more defensible in an interview
@@ -281,13 +281,13 @@ established enough" would have been.
 
 ### sqlfluff, brought forward from Phase 6
 
-CLAUDE.md's definition-of-done lists `sqlfluff lint models/` as applying to *every* phase, not
+CONVENTIONS.md's definition-of-done lists `sqlfluff lint models/` as applying to *every* phase, not
 just the Phase 6 CI wiring — so `dbt/.sqlfluff` (Snowflake dialect, dbt templater,
 `target: duckdb` so linting needs no cloud account) and `make sqlfluff-lint` exist from this
 phase on, not deferred. One config decision worth recording: `value` is a reserved word in
 Snowflake, which sqlfluff's `references.keywords` rule flags by default. Rather than rename the
-column, `ignore_words = value` was added to `.sqlfluff` — CLAUDE.md explicitly blesses `value`
-as the one acceptable exception to "never a meaningless column name," and per CLAUDE.md's own
+column, `ignore_words = value` was added to `.sqlfluff` — CONVENTIONS.md explicitly blesses `value`
+as the one acceptable exception to "never a meaningless column name," and per CONVENTIONS.md's own
 rule ("if style and sqlfluff disagree, fix sqlfluff's config"), the config yields, not the
 column name.
 
@@ -295,7 +295,7 @@ column name.
 
 ## Phase 4: Dimensional marts
 
-Grain declared before any model SQL, per CLAUDE.md's instruction. Four fact-grain objects this
+Grain declared before any model SQL, per CONVENTIONS.md's instruction. Four fact-grain objects this
 phase builds, each answering a different question:
 
 - **`fct_observations`** — grain: **one row per series, per observation date, per vintage**
@@ -380,7 +380,7 @@ recompute-from-scratch model (a hash is pure and deterministic — the same `ser
 produces the same `series_key`, in any build, on any target, without needing to consult prior
 state). The natural keys (`series_id`, `obs_date`) are kept alongside the surrogate keys in
 `dim_series`/`stg_observations` for human readability and debugging, but `fct_observations` and
-the marts join and filter on the surrogate keys only, per CLAUDE.md's "do not use raw natural
+the marts join and filter on the surrogate keys only, per CONVENTIONS.md's "do not use raw natural
 keys as joins into facts."
 
 ### Why the mart is monthly, not daily
@@ -797,7 +797,7 @@ into two, so a regression here fails loudly instead of passing on a technicality
 
 ### Why this phase exists
 
-The project's stated purpose (`CLAUDE.md`) is to demonstrate dbt, a cloud warehouse, and
+The project's stated purpose (`CONVENTIONS.md`) is to demonstrate dbt, a cloud warehouse, and
 dimensional modeling to recruiters. Everything through Phase 8 proves the warehouse is real;
 nothing proved it was *queryable by anything other than dbt itself*. A thin, read-only API
 closes that gap cheaply — it adds no new data, no new pipeline, and no new warehouse, just a
@@ -817,7 +817,7 @@ calls `duckdb.connect(..., read_only=True)` directly. Three reasons, not one:
   The as-of endpoint (below) specifically needs to reproduce a dbt model's SQL closely
   enough that a reviewer can diff the two — SQLAlchemy Core would obscure that, not help it.
 - One dependency avoided. `requirements.txt`'s own comment calls this "nothing exotic" —
-  a second ORM-adjacent layer for a read-only file query is the kind of addition `CLAUDE.md`
+  a second ORM-adjacent layer for a read-only file query is the kind of addition `CONVENTIONS.md`
   asks to flag before making, so it wasn't made.
 
 Connections are opened per request (`api/db.py`'s `get_connection` FastAPI dependency) rather
@@ -852,8 +852,8 @@ compile time.
 
 Read-only, three routes plus `/health`. No write endpoints, no auth, no rate limiting, no
 Snowflake target for the API (querying the trial warehouse per request would violate
-`CLAUDE.md`'s cost constraints the same way an unmanaged connection pool would) — this is a
-query layer over an existing warehouse, not a new system of record, and `CLAUDE.md`'s rule
+`CONVENTIONS.md`'s cost constraints the same way an unmanaged connection pool would) — this is a
+query layer over an existing warehouse, not a new system of record, and `CONVENTIONS.md`'s rule
 against fabricating data applies here exactly as everywhere else in this project: if
 `bridge.duckdb` doesn't exist yet, `/health` and every DB-backed route say so plainly (via
 `ping()`, mirroring `db.py`'s and `db_snowflake.py`'s own `ping()` functions) rather than
