@@ -58,7 +58,7 @@ defensible.
 - Do not ingest the full FRED catalog. A curated set of roughly 15 to 25 series is more than
   enough to demonstrate the modeling, and a bloated warehouse demonstrates nothing extra.
 - The **DuckDB profile** is the one that has to keep working: it is what CI builds and what
-  anyone cloning the repo runs. A portfolio repo a recruiter cannot run is a dead portfolio repo.
+  anyone cloning the repo runs. A repo nobody can run from a fresh clone is a dead repo.
 
 ## Secrets
 

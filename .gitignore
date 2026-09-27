@@ -46,3 +46,6 @@ orchestration/config/
 
 # OS
 .DS_Store
+
+# Personal prep notes, kept locally and out of the public repo
+INTERVIEW_NOTES.md

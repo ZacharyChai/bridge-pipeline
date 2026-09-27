@@ -1,7 +1,7 @@
 """TaskFlow DAG for the Phase 2+ Snowflake pipeline: vintage-aware FRED/ALFRED ingest
 into RAW, then a dbt build on top of it.
 
-This is the pipeline README.md and INTERVIEW_NOTES.md flagged as unscheduled ("no
+This is the pipeline README.md and the Phase 7 notes flagged as unscheduled ("no
 scheduled ingestion for the Snowflake path", Phase 8). See DECISIONS.md for why Airflow
 ended up here instead of the Dagster asset-graph originally sketched for that phase.
 """

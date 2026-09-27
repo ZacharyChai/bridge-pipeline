@@ -173,8 +173,8 @@ the image build and the live deploy, not just a red check on the PR. See
 
 ## API
 
-A small, read-only FastAPI service (`api/`) over the same warehouse — for a recruiter or
-interviewer to poke at with `curl` or `/docs`, not a second system of record. It queries
+A small, read-only FastAPI service (`api/`) over the same warehouse, for querying it with
+`curl` or `/docs`, not a second system of record. It queries
 `dim_series`, `fct_observations_latest`, and `fct_observations_point_in_time` directly
 against whichever DuckDB (or Snowflake) file `make dbt-build` last produced; it writes
 nothing.
@@ -219,9 +219,7 @@ Locally: `make dbt-docs`.
 
 [`DECISIONS.md`](DECISIONS.md) is the project's full design log — grain statements, the
 SCD Type 2 approach and what was rejected, surrogate key strategy, every non-obvious choice
-and why, organized by phase. [`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md) is the short,
-spoken-register companion: the three hardest problems and how they got solved, likely
-interviewer questions with answers, and an honest list of what this project doesn't do.
+and why, organized by phase.
 
 ## Legacy path: Postgres + GCE
 
@@ -257,7 +255,7 @@ Local dev instructions for this path: [`SETUP.md`](SETUP.md).
 | Phase 4 — dimensional marts, SCD Type 2 | done |
 | Phase 5 — testing and data quality | done |
 | Phase 6 — CI and documentation | done |
-| Phase 7 — decisions record ([`DECISIONS.md`](DECISIONS.md)), interview notes ([`INTERVIEW_NOTES.md`](INTERVIEW_NOTES.md)) | done |
+| Phase 7: decisions record ([`DECISIONS.md`](DECISIONS.md)) | done |
 | Phase 8 — Airflow orchestration ([`orchestration/`](orchestration/)) | done |
 | Phase 9 — [REST API](#api) (`api/`) | done |
 
@@ -294,7 +292,6 @@ docs/                             lineage.png
 AUDIT.md                          Phase 0 audit of the pre-rebuild repo
 CONVENTIONS.md                    naming, SQL style, cost constraints, definition of done
 DECISIONS.md                      design decisions, by phase
-INTERVIEW_NOTES.md                spoken-register companion to DECISIONS.md
 dbt-versions.txt                  single source of truth for dbt version pins
 Dockerfile, docker-compose.yml    legacy local dev image + stack
 Makefile                          test/lint/dbt-*/sqlfluff-*/api-* targets

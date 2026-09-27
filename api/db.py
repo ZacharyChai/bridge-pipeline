@@ -1,8 +1,8 @@
 """Read-only DuckDB access for the API.
 
 One connection per request rather than a pool -- this is a small, single-file embedded
-warehouse queried read-only, and a pool is complexity this project doesn't need to defend
-in an interview (see DECISIONS.md's Phase 9 entry). DuckDB allows multiple concurrent
+warehouse queried read-only, and a pool is complexity this project doesn't need
+(see DECISIONS.md's Phase 9 entry). DuckDB allows multiple concurrent
 read_only connections against the same file, so this is safe alongside a `dbt build` writer
 as long as no writer is active at the instant a request lands -- a fine guarantee for a
 portfolio service, not a claim this would hold under real concurrent-write traffic.

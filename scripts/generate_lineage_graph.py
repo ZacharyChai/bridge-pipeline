@@ -21,7 +21,7 @@ OUT = ROOT / "docs" / "lineage"
 
 KEEP_PACKAGE = "bridge_pipeline"
 # Generic schema tests (not_null/unique/relationships/dbt_expectations/dbt_utils) would
-# clutter a recruiter-facing diagram without adding signal; singular business-logic tests stay.
+# clutter the README diagram without adding signal; singular business-logic tests stay.
 GENERIC_TEST_PREFIXES = (
     "not_null_",
     "unique_",

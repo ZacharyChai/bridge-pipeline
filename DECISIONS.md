@@ -5,10 +5,7 @@ considered, why this one, and what would change the answer. Organized by phase, 
 the work actually happened — that order is itself part of the story (several entries exist
 *because* something built in an earlier phase surfaced a problem that changed a later one, e.g.
 Phase 2's vintage-cap discovery reshaping the ingest design, or Phase 4/5's two incidents
-reshaping how seeds and CI are configured). `INTERVIEW_NOTES.md` is the short, spoken-register
-companion to this document — grain statements in one sentence, the three hardest problems, the
-questions an interviewer would actually ask. This file is the long-form backing for those
-answers.
+reshaping how seeds and CI are configured).
 
 **Contents**: [Phase 1](#phase-1-snowflake-connection-and-the-duckdb-fallback) (Snowflake vs.
 alternatives, DuckDB fallback, warehouse sizing) · [Phase 2](#phase-2-ingestion-into-the-raw-layer)
@@ -32,7 +29,7 @@ Snowflake was the original plan's default and is kept for three reasons specific
 (a portfolio piece for AE/data-analyst roles, not a production system):
 
 - **Warehouse-native dbt story.** Snowflake's separation of storage and compute, and its
-  time-travel/cloning features, are commonly discussed in dbt-adjacent interviews. BigQuery is
+  time-travel/cloning features, are well-trodden ground for dbt projects. BigQuery is
   an equally strong choice for the same reason and would have been fine; Snowflake was picked
   because it's the more common ask in the specific postings this project targets.
 - **Trial economics fit a part-time build.** A 30-day free-credit trial with pause-friendly XS
@@ -50,7 +47,7 @@ across all three.
 ### Why a DuckDB fallback exists
 
 The Snowflake trial is time- and credit-limited. A portfolio repo that stops working the moment
-the trial expires is a liability, not an asset — a recruiter cloning it six months from now must
+the trial expires is a liability, not an asset: anyone cloning it six months from now must
 get a working build. `dbt-duckdb` lets the entire project (same models, same tests) run against a
 local file with zero cloud account, selected via `DBT_TARGET=duckdb` (the default) versus
 `DBT_TARGET=snowflake`. This is a dbt target swap, not a second codebase — Phase 4's dimensional
@@ -58,9 +55,8 @@ models are written once and validated against both.
 
 Alternative considered and rejected: documenting "you'll need your own Snowflake trial to run
 this" in the README. Rejected because it fails the Phase 6 acceptance bar directly ("a stranger
-can clone the repo and get a working build in under five minutes") and because most of this
-project's audience (recruiters, interviewers skimming a repo) will not sign up for a trial just
-to evaluate it.
+can clone the repo and get a working build in under five minutes") and because most people
+evaluating a repo will not sign up for a trial just to run it.
 
 ### Warehouse sizing rationale
 
@@ -157,7 +153,7 @@ re-stamping pattern is present).
   real. `ingest.fred.fetch_vintage_observations(..., full_history=False)` implements this: same
   function, same output shape, just without the wide realtime window.
 
-What would change this answer: if a specific interview or use case needed to know "what did we
+What would change this answer: if a use case needed to know "what did we
 believe the 10Y yield was as of some past date" (e.g. modeling a data-vendor lag), the
 `vintage_tracked=False` series would need the same paginated `/fred/series/vintagedates`
 approach used to investigate this in the first place — technically possible, just not worth the
@@ -275,7 +271,7 @@ out of sync with what the real ingest actually returns.
 CONVENTIONS.md's naming convention says dates get a `_date` suffix. `stg_observations` renames
 `realtime_start`/`realtime_end` (raw FRED field names) to `realtime_start_date`/
 `realtime_end_date` — applied uniformly rather than carved out as an exception, on the
-reasoning that a consistent, literally-followed convention is more defensible in an interview
+reasoning that a consistent, literally-followed convention is easier to defend
 than "renamed observation_start but not realtime_start because ALFRED terminology felt
 established enough" would have been.
 
@@ -455,7 +451,7 @@ an unscoped `dbt seed`/`dbt build` against `snowflake` structurally cannot touch
 by running `dbt seed --target snowflake` and confirming it processes only `dim_series_category`
 (1 seed, not 3). Restored production data with a fresh `ingest.pipeline_snowflake` run,
 re-verified the mart's z-score and spread populate correctly across full history afterward.
-Worth flagging in an interview: this is a real mistake, caught by noticing data looked wrong
+Worth flagging: this is a real mistake, caught by noticing data looked wrong
 rather than by any test — Phase 5's testing work should consider whether a row-count sanity
 check on `RAW` (e.g. "did this table just shrink") would have caught it faster.
 
@@ -570,7 +566,7 @@ rotated Snowflake credential can never take down the published docs site — a r
 ### The lineage image: generated from `manifest.json`, not a screenshot
 
 `dbt docs`' own interactive lineage view is a JS graph with no built-in static-image export,
-and the accessible view rendered too cluttered/cramped for a recruiter skimming a README (see
+and the accessible view rendered too cluttered/cramped for someone skimming a README (see
 `scripts/generate_lineage_graph.py`). Rendered `docs/lineage.png` directly from
 `manifest.json`'s `depends_on` edges with Graphviz instead — full control over layout, color
 by layer (source/seed, staging, dim/fct, mart, test), and one exclusion rule worth recording:
@@ -605,27 +601,24 @@ any individual technical choice above.
 
 ### Airflow, not Dagster — reversing the Phase 6 sketch
 
-`INTERVIEW_NOTES.md`'s "what would you build next" answer (written during Phase 7) named
+The Phase 7 notes on what to build next named
 Dagster, modeling the FRED ingest and dbt build as one graph of assets. This phase built
 Airflow instead, and that's worth being honest about rather than quietly rewriting history:
 Dagster's asset-centric model is arguably a better conceptual fit for "ingest feeds a dbt
 project," but Airflow is the far more common ask in the postings this project targets, and the
 TaskFlow API (`@dag`/`@task`) demonstrates the same DAG-authoring, retry, and idempotency
-concepts an interviewer would probe regardless of which tool answers the question. Given a
-choice between the tool that fits the data model more elegantly and the tool more of the
-target audience will actually recognize on a resume, this project picked the second — the same
-"target the postings" logic Phase 1 used to pick Snowflake over BigQuery.
+concepts regardless of which tool answers the question. Given a choice between the tool that
+fits the data model more elegantly and the tool more teams actually run, this project picked
+the second, on the same "target the postings" logic Phase 1 used to pick Snowflake over BigQuery.
 
 ### LocalExecutor + local Docker Compose, not managed Airflow or Celery
 
 Three alternatives considered and rejected, all for the same underlying reason — this is one
 daily DAG per pipeline, not horizontal scale across many concurrent DAGs:
 
-- **MWAA / Cloud Composer** bill hourly for a managed control plane. Running one for a resume
-  bullet, then having to explain in an interview why a portfolio project pays for managed
-  infrastructure it didn't need, is a worse outcome than not having it — the honest answer to
-  "why not managed Airflow" (cost, and the workload doesn't need it) is a stronger interview
-  moment than a screenshot of an idle MWAA environment.
+- **MWAA / Cloud Composer** bill hourly for a managed control plane. Paying for managed
+  infrastructure this workload doesn't need is worse than not having it: the honest answer to
+  "why not managed Airflow" is cost, and that the workload doesn't need it.
 - **CeleryExecutor / KubernetesExecutor** solve horizontal scaling across many concurrent
   workers. Reaching for them here — two DAGs, one run each per day — is architecture that
   doesn't match the actual workload, which reads as copied from a tutorial rather than
@@ -638,14 +631,11 @@ daily DAG per pipeline, not horizontal scale across many concurrent DAGs:
   Airflow 3 split the old 2.x webserver into a separate `airflow-apiserver` plus its own
   `airflow-dag-processor` service, a structural change worth getting right rather than guessing).
 
-What would change the answer: genuinely needing to run many independent DAGs concurrently, or
-specifically interviewing at a shop known to run MWAA/Composer (in which case spinning up the
-smallest managed environment just long enough to screenshot it, then tearing it down before
-next month's bill, is the one scenario where the managed cost is worth paying).
+What would change the answer: genuinely needing to run many independent DAGs concurrently.
 
 ### Both pipelines get a DAG, not just the unscheduled one
 
-Only the Snowflake pipeline was actually missing scheduling (`INTERVIEW_NOTES.md`'s "no
+Only the Snowflake pipeline was actually missing scheduling (the Phase 7 notes listed "no
 scheduled ingestion for the Snowflake path" — the legacy Postgres pipeline already runs daily
 via the GCE cron entry). `legacy_postgres_pipeline` was built anyway, alongside
 `snowflake_dbt_pipeline`, because the interesting orchestration concepts — TaskFlow wiring,
@@ -798,7 +788,7 @@ into two, so a regression here fails loudly instead of passing on a technicality
 ### Why this phase exists
 
 The project's stated purpose (`CONVENTIONS.md`) is to demonstrate dbt, a cloud warehouse, and
-dimensional modeling to recruiters. Everything through Phase 8 proves the warehouse is real;
+dimensional modeling. Everything through Phase 8 proves the warehouse is real;
 nothing proved it was *queryable by anything other than dbt itself*. A thin, read-only API
 closes that gap cheaply — it adds no new data, no new pipeline, and no new warehouse, just a
 query layer over the marts that already exist.
@@ -822,7 +812,7 @@ calls `duckdb.connect(..., read_only=True)` directly. Three reasons, not one:
 
 Connections are opened per request (`api/db.py`'s `get_connection` FastAPI dependency) rather
 than pooled. DuckDB supports multiple concurrent `read_only` connections against one file, so
-this is safe for the traffic this project will ever see (a recruiter or interviewer hitting
+this is safe for the traffic this project will ever see (occasional readers hitting
 `/docs`), not a claim it would hold under real concurrent write traffic — there is no
 connection pool here to misconfigure, which is the point.
 

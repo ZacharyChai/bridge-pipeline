@@ -52,5 +52,5 @@ terraform output ssh_command      # ssh deploy@<ip>
 terraform destroy
 ```
 
-Keeping the box running is the Linux-ops rep — don't destroy it until you've
-stopped using it as a resume talking point.
+Leave the box running unless you mean to retire the legacy path: it is the live half of this
+project.
