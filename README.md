@@ -3,9 +3,9 @@
 ![CI](https://github.com/ZacharyChai/bridge-pipeline/actions/workflows/ci.yml/badge.svg)
 
 A dimensional data warehouse for commercial real estate credit conditions: 17 curated
-[FRED](https://fred.stlouisfed.org/)/[ALFRED](https://alfred.stlouisfed.org/) macro series —
-the Treasury curve, inflation, labor, commercial property prices, and bank lending
-standards — ingested with full revision history, modeled in dbt as a proper star schema, and
+[FRED](https://fred.stlouisfed.org/)/[ALFRED](https://alfred.stlouisfed.org/) macro series
+(the Treasury curve, inflation, labor, commercial property prices, and bank lending
+standards), ingested with full revision history, modeled in dbt as a proper star schema, and
 served through a headline mart built to answer "what were macro conditions for CRE credit at a
 given point in time." Built and verified on Snowflake; runs entirely on DuckDB with no cloud account,
 so anyone cloning this repo gets a working build in [under five minutes](#quickstart-duckdb-no-account-needed).
@@ -65,27 +65,27 @@ make dag-test       # DagBag import + task-structure checks, run inside the Airf
 
 Retries with exponential backoff are on the FRED-API extract task specifically (the flakiest
 step in either DAG), each DAG has a structured on-failure callback, and reruns/backfills are
-idempotent by construction — see [`DECISIONS.md`](DECISIONS.md#phase-8-orchestration) for why,
+idempotent by construction; see [`DECISIONS.md`](DECISIONS.md#phase-8-orchestration) for why,
 and for why the live GCE cron entry (below) stays untouched rather than being pointed here.
 
 ### Why this shape
 
-- **Vintages, not just current values.** FRED/ALFRED data gets revised — a monthly CPI print
+- **Vintages, not just current values.** FRED/ALFRED data gets revised: a monthly CPI print
   is republished repeatedly as more source data comes in. `fct_observations` keeps every
   revision as its own row, so `fct_observations_point_in_time` can answer "what did we
-  believe this number was, as of some date in the past" — not just "what is it now." This is
+  believe this number was, as of some date in the past," not just "what is it now." This is
   the core modeling problem the project is built to demonstrate; see
   [`DECISIONS.md`](DECISIONS.md) for the full SCD Type 2 writeup, including a real API
   constraint that shaped the design (FRED periodically re-stamps an entire daily series'
-  history even when no value changed — full vintage tracking is scoped to the 10 series
+  history even when no value changed, so full vintage tracking is scoped to the 10 series
   where it's economically meaningful, not all 17).
 - **A legacy path still runs alongside it.** The original version of this repo ingested one
-  FRED series into Postgres — see [Legacy path](#legacy-path-postgres--gce) below. It's kept
+  FRED series into Postgres; see [Legacy path](#legacy-path-postgres--gce) below. It's kept
   running, not replaced in one pass, per this rebuild's own ground rules.
 
 ## Quickstart (DuckDB, no account needed)
 
-Verified end to end from a clean environment — clone to a fully green `dbt build` in about
+Verified end to end from a clean environment, from clone to a fully green `dbt build` in about
 3 minutes:
 
 ```bash
@@ -95,7 +95,7 @@ python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/dbt deps --project-dir dbt --profiles-dir dbt
 make dbt-build              # seeds a real ~4-year FRED/ALFRED fixture into DuckDB, then
-                             # builds and tests every model — 80 tests, all green
+                             # builds and tests every model: 80 tests, all green
 ```
 
 Then explore the warehouse, or the models themselves:
@@ -105,7 +105,7 @@ make dbt-docs                # generate + serve dbt docs locally, with the linea
 ```
 
 The DuckDB seed data (`dbt/seeds/*.csv`) is a real, trimmed snapshot from a live FRED/ALFRED
-pull — not synthetic — regenerated with `scripts/generate_dbt_seeds.py`. It includes at least
+pull (not synthetic), regenerated with `scripts/generate_dbt_seeds.py`. It includes at least
 one genuine revision (a `COMREPUSQ159N` reading that really changed across two vintages),
 because the point-in-time logic is tested against it.
 
@@ -127,9 +127,9 @@ make dbt-build TARGET=snowflake
 
 `infra/snowflake_setup.sql` provisions the account objects (an XS warehouse with
 `AUTO_SUSPEND=60`, `RAW`/`STAGING`/`MARTS` schemas, a dedicated `BRIDGE_DBT_ROLE`/
-`BRIDGE_DBT_USER` — dbt never connects as your own login). `ingest/pipeline_snowflake.py`
+`BRIDGE_DBT_USER`, so dbt never connects as your own login). `ingest/pipeline_snowflake.py`
 populates `RAW` with full history; the DuckDB seeds above are a fixture, not something you
-run against Snowflake (`dbt seed`'s raw-table targets are disabled there — see
+run against Snowflake (`dbt seed`'s raw-table targets are disabled there; see
 [`DECISIONS.md`](DECISIONS.md)).
 
 ## Stack
@@ -142,22 +142,22 @@ Uptime Kuma.
 ## Testing & CI
 
 ```bash
-make test              # pytest — unit tests need no DB; integration suites (Postgres,
+make test              # pytest: unit tests need no DB; integration suites (Postgres,
                         # Snowflake, and the API) all skip gracefully if unreachable
 make lint               # ruff check + format
 make sqlfluff-lint       # SQL lint, Snowflake dialect
-make dbt-build           # dbt build (all tests) — duckdb by default, TARGET=snowflake to switch
+make dbt-build           # dbt build (all tests); duckdb by default, TARGET=snowflake to switch
 ```
 
 80 dbt tests, 40+ over the project's own bar: generic tests (`not_null`/`unique`/
 `accepted_values`/`relationships`) on every model, `dbt-expectations` distributional bounds on
-every mart measure, and 5 singular tests covering real business logic — including one that
+every mart measure, and 5 singular tests covering real business logic, including one that
 proves point-in-time correctness against a genuine FRED revision, and one that reconciles the
 mart's headline spread against an independent recomputation from the base fact. Test severity
 is deliberate, not left at the default: a handful of distributional bounds and one
-recent-data-freshness check are `warn`, not `error` — see [`DECISIONS.md`](DECISIONS.md) for
+recent-data-freshness check are `warn`, not `error`; see [`DECISIONS.md`](DECISIONS.md) for
 which, and why (short version: two of those warnings have already fired for real, on the 2020
-COVID labor-market shock, exactly as intended — a genuine historical extreme, correctly
+COVID labor-market shock, exactly as intended: a genuine historical extreme, correctly
 flagged, not blocking the build).
 
 GitHub Actions runs ruff, sqlfluff, the full pytest suite (against a real Postgres service
@@ -167,7 +167,7 @@ import cleanly, have the expected tasks, retries, and failure callback) on every
 same build against Snowflake, into an isolated per-run schema torn down afterward, is a
 separate opt-in job (`SNOWFLAKE_CI_ENABLED=true` plus the account secrets), so the default
 CI run needs no cloud account. `build-and-push` and
-`deploy` both require `dag-integrity` to pass, not just `lint-and-test` — a broken DAG blocks
+`deploy` both require `dag-integrity` to pass, not just `lint-and-test`, so a broken DAG blocks
 the image build and the live deploy, not just a red check on the PR. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -194,7 +194,7 @@ make api-run             # http://localhost:8000/docs (interactive Swagger UI)
 
 The `as-of` endpoint is the one worth reading the code for: `fct_observations_point_in_time`
 (the dbt view) always answers "as of right now," because `current_date` there is a SQL
-function evaluated at query time, not the compile-time `as_of_date` dbt var — so the API
+function evaluated at query time, not the compile-time `as_of_date` dbt var, so the API
 re-derives that model's row-ranking logic directly against `fct_observations` (the fact
 table that keeps every revision) with the caller's date substituted in. See
 [`DECISIONS.md`](DECISIONS.md#phase-9-rest-api) for the full writeup, including why this
@@ -217,7 +217,7 @@ every merge to `main` and publish to GitHub Pages:
 
 Locally: `make dbt-docs`.
 
-[`DECISIONS.md`](DECISIONS.md) is the project's full design log — grain statements, the
+[`DECISIONS.md`](DECISIONS.md) is the project's full design log: grain statements, the
 SCD Type 2 approach and what was rejected, surrogate key strategy, every non-obvious choice
 and why, organized by phase.
 
@@ -225,17 +225,17 @@ and why, organized by phase.
 
 The original version of this project ingested one FRED series (`DGS10`, current values only)
 into Postgres, containerized, and deployed continuously to a hardened GCE VM. That path is
-kept running, not deleted in one pass — it still pulls fresh data daily, on the same GCE cron
+kept running, not deleted in one pass: it still pulls fresh data daily, on the same GCE cron
 entry it always has ([`deploy/bridge-pipeline.cron`](deploy/bridge-pipeline.cron)). The local
 Airflow instance (above) runs the same `extract -> quality_gate -> load` sequence as a DAG for
-demonstration, but doesn't control the live box — see
+demonstration, but doesn't control the live box; see
 [`DECISIONS.md`](DECISIONS.md#phase-8-orchestration) for why that cron entry stays put.
 
-- **Provisioning** ([`infra/`](infra/)) — Terraform stands up the VM (SSH-only firewall,
+- **Provisioning** ([`infra/`](infra/)): Terraform stands up the VM (SSH-only firewall,
   key-only auth, non-root deploy user).
-- **Continuous delivery** ([`deploy/`](deploy/)) — every merge to `main` builds the image,
+- **Continuous delivery** ([`deploy/`](deploy/)): every merge to `main` builds the image,
   pushes to GHCR, deploys over SSH.
-- **Monitoring & backup** — Uptime Kuma heartbeats; nightly `pg_dump` with a verified restore
+- **Monitoring & backup**: Uptime Kuma heartbeats; nightly `pg_dump` with a verified restore
   path.
 - **Legacy pipeline code**: `ingest/pipeline.py`, `ingest/fred.py`'s original
   `fetch_observations`, `transform/`, `db.py`.
@@ -247,17 +247,17 @@ Local dev instructions for this path: [`SETUP.md`](SETUP.md).
 
 | Phase | Status |
 |---|---|
-| M0-M6 — original Postgres/GCE pipeline (see [Legacy path](#legacy-path-postgres--gce)) | done |
-| Phase 0 — audit and baseline ([`AUDIT.md`](AUDIT.md)) | done |
-| Phase 1 — Snowflake + DuckDB fallback | done |
-| Phase 2 — ALFRED vintage ingest into Snowflake RAW | done |
-| Phase 3 — staging layer | done |
-| Phase 4 — dimensional marts, SCD Type 2 | done |
-| Phase 5 — testing and data quality | done |
-| Phase 6 — CI and documentation | done |
+| M0-M6: original Postgres/GCE pipeline (see [Legacy path](#legacy-path-postgres--gce)) | done |
+| Phase 0: audit and baseline ([`AUDIT.md`](AUDIT.md)) | done |
+| Phase 1: Snowflake + DuckDB fallback | done |
+| Phase 2: ALFRED vintage ingest into Snowflake RAW | done |
+| Phase 3: staging layer | done |
+| Phase 4: dimensional marts, SCD Type 2 | done |
+| Phase 5: testing and data quality | done |
+| Phase 6: CI and documentation | done |
 | Phase 7: decisions record ([`DECISIONS.md`](DECISIONS.md)) | done |
-| Phase 8 — Airflow orchestration ([`orchestration/`](orchestration/)) | done |
-| Phase 9 — [REST API](#api) (`api/`) | done |
+| Phase 8: Airflow orchestration ([`orchestration/`](orchestration/)) | done |
+| Phase 9: [REST API](#api) (`api/`) | done |
 
 ## Repository layout
 
@@ -267,17 +267,17 @@ api/                              Phase 9: read-only FastAPI service over the ma
   db.py                            DuckDB connection (read-only, request-scoped)
   schemas.py                       pydantic response models
 ingest/                          FRED/ALFRED ingest
-  fred.py                          HTTP client — legacy single-series + Phase 2 vintage-aware fetch
+  fred.py                          HTTP client: legacy single-series + Phase 2 vintage-aware fetch
   series.py                        curated 17-series catalog
   pipeline.py                      legacy pipeline (Postgres, single series)
   pipeline_snowflake.py            current pipeline (Snowflake RAW, full vintage history)
-db.py, db_snowflake.py           warehouse access — legacy Postgres / current Snowflake RAW
+db.py, db_snowflake.py           warehouse access: legacy Postgres / current Snowflake RAW
 config.py                        typed settings from env / .env
 dbt/                              dbt project
-  models/staging/                  stg_ models — rename, cast, nothing else
-  models/marts/                    dim_/fct_/mart_ — the dimensional model
+  models/staging/                  stg_ models: rename, cast, nothing else
+  models/marts/                    dim_/fct_/mart_: the dimensional model
   seeds/                           DuckDB fixture data (real, trimmed FRED/ALFRED snapshot)
-  tests/                           singular tests — business logic, not schema
+  tests/                           singular tests: business logic, not schema
   macros/                          generate_schema_name override
 orchestration/                    local Airflow (LocalExecutor) -- both pipelines' DAGs
   dags/                             legacy_postgres_pipeline.py, snowflake_dbt_pipeline.py
@@ -286,7 +286,7 @@ orchestration/                    local Airflow (LocalExecutor) -- both pipeline
 infra/                            Terraform (legacy GCE) + snowflake_setup.sql
 deploy/                           legacy CD scripts, prod compose, cron, backup
 scripts/                          generate_dbt_seeds.py, generate_lineage_graph.py, db-tunnel.sh
-tests/                            pytest suite — ingest, transform, quality, both warehouses
+tests/                            pytest suite: ingest, transform, quality, both warehouses
 docs/                             lineage.png
 .github/                          CI workflow
 AUDIT.md                          Phase 0 audit of the pre-rebuild repo
