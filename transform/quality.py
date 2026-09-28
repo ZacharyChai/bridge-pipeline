@@ -1,7 +1,7 @@
 """Data-quality checks. Each raises DataQualityError on violation.
 
-These are the automated assertions the original plan calls for — schema/nulls, row
-count, uniqueness, numeric values, and freshness — run on the clean rows before
+These are the automated assertions the original plan calls for (schema/nulls, row
+count, uniqueness, numeric values, and freshness), run on the clean rows before
 they're trusted as the warehouse output.
 """
 

@@ -1,6 +1,6 @@
 """Warehouse access: schema, idempotent loads, and reads against Postgres.
 
-SQLAlchemy Core (not the ORM) — the shapes are simple and the SQL stays visible,
+SQLAlchemy Core (not the ORM): the shapes are simple and the SQL stays visible,
 which is the point of the "real DB ops" rep. Loads upsert on the (series_id,
 date) primary key so re-running the pipeline is safe.
 """
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS clean_observations (
 
 def make_engine(settings: Settings, *, connect_timeout: int = 10) -> Engine:
     # connect_timeout keeps a dead/unreachable warehouse from hanging the whole
-    # process — the pipeline (and the integration-test skip) fail fast instead.
+    # process: the pipeline (and the integration-test skip) fail fast instead.
     return create_engine(
         settings.database_url,
         future=True,
@@ -41,7 +41,7 @@ def make_engine(settings: Settings, *, connect_timeout: int = 10) -> Engine:
 
 
 def ping(engine: Engine) -> bool:
-    """True if the warehouse is reachable — used to skip integration tests."""
+    """True if the warehouse is reachable: used to skip integration tests."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

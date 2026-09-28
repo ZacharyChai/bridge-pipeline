@@ -1,4 +1,4 @@
-# Bridge Project — task runner.
+# Bridge Project: task runner.
 # Targets fill in as milestones land; each target notes the milestone that implements it.
 
 .PHONY: help install test lint fmt run run-snowflake up down deploy db-up db-down dbt-debug dbt-seed dbt-build dbt-docs sqlfluff-lint sqlfluff-fix airflow-up airflow-down airflow-logs dag-test api-run api-test

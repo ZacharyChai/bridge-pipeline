@@ -5,7 +5,7 @@ against a fake session so no network is required.
 
 Phase 2 adds: vintage-aware parsing/fetching (preserves realtime_start/realtime_end
 instead of discarding them), series metadata parsing/fetching, and API-failure
-propagation (a real gap the Phase 0 audit flagged — nothing exercised this before).
+propagation (a real gap the Phase 0 audit flagged: nothing exercised this before).
 """
 
 import pytest
@@ -23,7 +23,7 @@ from ingest.fred import (
 )
 
 # A trimmed but real-shaped FRED /series/observations payload. Note the "."
-# value — FRED's missing-data marker for non-trading days. Handling it is the
+# value: FRED's missing-data marker for non-trading days. Handling it is the
 # whole point of the transform/quality layer.
 SAMPLE_PAYLOAD = {
     "observation_start": "1600-01-01",
@@ -86,7 +86,7 @@ class _FakeResponse:
 
 
 class _FakeSession:
-    """Records the request and returns a canned payload — no network."""
+    """Records the request and returns a canned payload: no network."""
 
     def __init__(self, payload):
         self._payload = payload
@@ -136,8 +136,8 @@ def test_fetch_observations_raises_on_http_error():
 # --- Phase 2: vintage-aware observations (ALFRED) ---------------------------------
 
 # Two rows for the *same* observation date: an initial print, then a later revision.
-# This is exactly what a real ALFRED pull looks like for a series that gets revised —
-# e.g. CPI or payrolls — and it's what parse_observations (above) collapses away by
+# This is exactly what a real ALFRED pull looks like for a series that gets revised
+# (e.g. CPI or payrolls), and it's what parse_observations (above) collapses away by
 # only ever keeping series_id/date/value.
 SAMPLE_VINTAGE_PAYLOAD = {
     "observations": [
@@ -186,7 +186,7 @@ def test_fetch_vintage_observations_raises_on_http_error():
 
 def test_fetch_vintage_observations_full_history_false_omits_wide_window():
     # full_history=False is for series where full ALFRED history either isn't fetchable in
-    # one call or isn't meaningful (see ingest/series.py's vintage_tracked flag) — it should
+    # one call or isn't meaningful (see ingest/series.py's vintage_tracked flag): it should
     # fall back to FRED's own default window rather than requesting everything, while still
     # preserving realtime_start/realtime_end (unlike the legacy parse_observations).
     session = _FakeSession(SAMPLE_VINTAGE_PAYLOAD)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Startup script — runs as root on first boot (GCP metadata_startup_script).
+# Startup script: runs as root on first boot (GCP metadata_startup_script).
 # Hardens the box and installs Docker. Written to be idempotent so re-runs on
 # reboot are safe. Logs to /var/log/bootstrap.log.
 set -euxo pipefail

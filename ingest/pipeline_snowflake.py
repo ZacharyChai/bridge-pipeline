@@ -2,12 +2,12 @@
 
 Run with `python -m ingest.pipeline_snowflake` (or `make run-snowflake`). Separate from
 ingest/pipeline.py (the legacy single-series Postgres path), which keeps running unchanged
-until this path is verified end to end — see CONVENTIONS.md's rule against deleting the Postgres
+until this path is verified end to end; see CONVENTIONS.md's rule against deleting the Postgres
 path in one pass.
 
 Unlike the legacy pipeline, there is no data-quality gate here: RAW is deliberately
 unvalidated (Phase 5 adds dbt tests once data reaches staging/marts). This pipeline's only
-job is to land what FRED/ALFRED returned — completely, idempotently, and if any single series
+job is to land what FRED/ALFRED returned: completely, idempotently, and if any single series
 fails to fetch, the whole run aborts rather than silently landing a partial pull (same
 "never fabricate, never silently substitute" rule the legacy pipeline follows).
 """
@@ -47,7 +47,7 @@ def run(settings: SnowflakeSettings) -> dict[str, int]:
         obs = fetch_vintage_observations(
             series_id, settings.fred_api_key, full_history=vintage_tracked
         )
-        # Two different loaders, not two branches of the same one — see db_snowflake.py's
+        # Two different loaders, not two branches of the same one; see db_snowflake.py's
         # module docstring for why: the merge key genuinely differs depending on whether
         # these rows represent real ALFRED vintages or a same-stamped "current value" batch.
         loader = load_observations_vintage if vintage_tracked else load_observations_current
@@ -74,7 +74,7 @@ def main() -> None:
         sys.exit(2)
     if not (settings.account and settings.user and settings.password):
         log.error(
-            "SNOWFLAKE_ACCOUNT/SNOWFLAKE_USER/SNOWFLAKE_PASSWORD are not fully set — "
+            "SNOWFLAKE_ACCOUNT/SNOWFLAKE_USER/SNOWFLAKE_PASSWORD are not fully set; "
             "run infra/snowflake_setup.sql and fill in .env first"
         )
         sys.exit(2)

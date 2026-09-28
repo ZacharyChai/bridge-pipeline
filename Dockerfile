@@ -11,7 +11,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run as a non-root user (least privilege — also sets up the M4 hardening habit).
+# Run as a non-root user (least privilege: also sets up the M4 hardening habit).
 RUN useradd --create-home --uid 1000 appuser
 
 # Copy only what the pipeline needs at runtime (no tests, infra, venv, or .env).

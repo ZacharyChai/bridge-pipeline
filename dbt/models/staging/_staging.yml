@@ -4,7 +4,7 @@ models:
   - name: stg_series_metadata
     description: >
       One row per FRED series, renamed and typed from raw_fred.series_metadata. No joins,
-      no business logic — the CRE-relevant `group` classification lives in a dbt seed
+      no business logic: the CRE-relevant `group` classification lives in a dbt seed
       consumed by dim_series (Phase 4), not here.
     columns:
       - name: series_id
@@ -40,7 +40,7 @@ models:
   - name: stg_observations
     description: >
       Vintage-aware FRED/ALFRED observations, renamed and typed from raw_fred.observations.
-      Grain: one row per (series_id, obs_date, realtime_start_date) — enforced by
+      Grain: one row per (series_id, obs_date, realtime_start_date); enforced by
       tests/assert_stg_observations_unique_grain.sql, since dbt's built-in `unique` test only
       covers a single column. No joins, no business logic, no aggregation.
     columns:
@@ -55,12 +55,12 @@ models:
       - name: value
         description: >
           The observed value, cast to a number. FRED's "." missing-value marker (and anything
-          else unparseable) becomes null here via try_cast rather than the row being dropped —
+          else unparseable) becomes null here via try_cast rather than the row being dropped:
           see DECISIONS.md's Phase 3 entry.
       - name: realtime_start_date
         description: >
           First date this specific vintage of the value was known to be current. Part of the
-          composite primary key — see DECISIONS.md's Phase 2 entry for why this, not obs_date
+          composite primary key; see DECISIONS.md's Phase 2 entry for why this, not obs_date
           alone, is the versioning key.
         tests:
           - not_null

@@ -1,7 +1,7 @@
 # M2: app + warehouse, reproducible from a clean clone.
 #
 # The pipeline talks to Postgres over the compose network (host "db"), so it
-# needs no host port-forward — which is exactly why this works cleanly on a
+# needs no host port-forward, which is exactly why this works cleanly on a
 # machine where Colima's forwarding is broken.
 #
 #   docker compose up --build     # brings up Postgres, waits for health, runs the pipeline

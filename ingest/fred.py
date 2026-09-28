@@ -1,14 +1,14 @@
 """FRED ingest: fetch and parse a macro series from the FRED API.
 
-Kept deliberately thin — HTTP in, list-of-dicts out. All the interesting logic
+Kept deliberately thin: HTTP in, list-of-dicts out. All the interesting logic
 (cleaning, typing, quality) lives downstream in transform/, so this stays easy
 to test with a fake session and no network.
 
 Two ingest shapes live here:
-  - fetch_observations / parse_observations — the original M1 path: current values only,
+  - fetch_observations / parse_observations (the original M1 path): current values only,
     realtime_start/realtime_end discarded. Still used by the legacy single-series Postgres
     pipeline (ingest/pipeline.py) until that path is retired.
-  - fetch_vintage_observations / fetch_series_metadata — the Phase 2 path: full ALFRED
+  - fetch_vintage_observations / fetch_series_metadata (the Phase 2 path): full ALFRED
     revision history (every realtime_start/realtime_end preserved) plus series metadata,
     used by the multi-series Snowflake RAW pipeline (ingest/pipeline_snowflake.py).
 """
@@ -23,7 +23,7 @@ FRED_SERIES_META_URL = "https://api.stlouisfed.org/fred/series"
 # FRED's own convention for "give me every vintage that ever existed": a realtime window wide
 # enough to cover the full revision history, rather than just the latest value as of today.
 # Passing this pair of params to the *same* /series/observations endpoint is what ALFRED's
-# vintage behavior actually is — there is no separate ALFRED base URL.
+# vintage behavior actually is: there is no separate ALFRED base URL.
 ALFRED_ALL_VINTAGES_START = "1776-07-04"
 ALFRED_ALL_VINTAGES_END = "9999-12-31"
 
@@ -103,16 +103,16 @@ def fetch_vintage_observations(
     every row (unlike fetch_observations, which discards them).
 
     `full_history=True` (default) requests FRED's full revision history via a maximally wide
-    realtime window — every vintage FRED has ever published for each observation date. This is
+    realtime window: every vintage FRED has ever published for each observation date. This is
     what makes the pull an ALFRED pull rather than a plain FRED pull.
 
     `full_history=False` fetches just the current vintage per date (FRED's default window),
     still with realtime_start/realtime_end preserved. Use this for series where full history
-    either isn't meaningful or isn't fetchable in one call — see ingest/series.py's
+    either isn't meaningful or isn't fetchable in one call; see ingest/series.py's
     `vintage_tracked` flag and DECISIONS.md's Phase 2 entry: FRED periodically re-stamps an
     entire daily series' whole history under a new realtime_start even when no value actually
     changed (a bulk republish, not a real revision), which for a series like DGS10 produces
-    5000+ "vintage dates" and exceeds FRED's own 2000-vintage-date cap on a single request —
+    5000+ "vintage dates" and exceeds FRED's own 2000-vintage-date cap on a single request:
     for essentially never-revised market rates, that's noise, not signal worth chasing.
     """
     session = session or requests.Session()

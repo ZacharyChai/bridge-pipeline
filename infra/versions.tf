@@ -13,7 +13,7 @@ provider "google" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
-  # Auth via Application Default Credentials — no keys in code. Set one of:
+  # Auth via Application Default Credentials: no keys in code. Set one of:
   #   gcloud auth application-default login        (interactive), or
   #   GOOGLE_APPLICATION_CREDENTIALS=/path/key.json (service-account key)
 }

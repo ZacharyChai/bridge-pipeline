@@ -1,7 +1,7 @@
 """Phase 2: sanity checks on the curated FRED series catalog.
 
-Not testing FRED itself (that happened once, live, while curating the list — see
-DECISIONS.md) — just guarding against catalog mistakes: duplicates, an empty group,
+Not testing FRED itself (that happened once, live, while curating the list; see
+DECISIONS.md), just guarding against catalog mistakes: duplicates, an empty group,
 or drifting outside the 15-25 series budget CONVENTIONS.md sets.
 """
 

@@ -1,12 +1,12 @@
 # dbt connection profiles for this project.
 #
-# Every credential comes from an environment variable (see ../.env.example) — nothing here is a
+# Every credential comes from an environment variable (see ../.env.example): nothing here is a
 # literal secret, so this file is safe to commit.
 #
 # Two targets under one profile:
-#   duckdb    — a local file, no cloud account needed. Default, so `dbt debug`/`dbt build` work
+#   duckdb: a local file, no cloud account needed. Default, so `dbt debug`/`dbt build` work
 #               out of the box for anyone who clones the repo.
-#   snowflake — the real warehouse. Select it with `--target snowflake` or DBT_TARGET=snowflake.
+#   snowflake: the real warehouse. Select it with `--target snowflake` or DBT_TARGET=snowflake.
 #
 # Invoke dbt from the repo root with:
 #   dbt debug --project-dir dbt --profiles-dir dbt

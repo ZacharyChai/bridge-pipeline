@@ -1,7 +1,7 @@
 """Phase 2 integration: prove the Snowflake RAW loader is idempotent and handles revisions.
 
 Skipped automatically when no Snowflake account is reachable (mirrors
-test_pipeline_integration.py's pattern for Postgres) — so the unit suite stays green
+test_pipeline_integration.py's pattern for Postgres), so the unit suite stays green
 anywhere, and this runs for real once SNOWFLAKE_* env vars point at a live account
 (see infra/snowflake_setup.sql).
 """
@@ -14,10 +14,10 @@ from db_snowflake import make_engine, ping
 
 pytestmark = pytest.mark.integration
 
-# RAW is shared with the real pipeline (ingest/pipeline_snowflake.py writes the same tables) —
+# RAW is shared with the real pipeline (ingest/pipeline_snowflake.py writes the same tables):
 # these IDs exist only so tests have something to key on that can never collide with a real
 # FRED series_id, and every test that writes one cleans it up in a finally block. Without that,
-# a test run leaves rows sitting in production RAW indefinitely (this happened once — see
+# a test run leaves rows sitting in production RAW indefinitely (this happened once; see
 # DECISIONS.md's Phase 2 entry).
 TEST_META_ID = "TEST_META"
 TEST_VINTAGE_ID = "TEST_VINTAGE"
@@ -28,7 +28,7 @@ TEST_CURRENT_ID = "TEST_CURRENT"
 def engine():
     settings = load_snowflake_settings()
     if not (settings.account and settings.user and settings.password):
-        pytest.skip("SNOWFLAKE_* env vars not set — run infra/snowflake_setup.sql first")
+        pytest.skip("SNOWFLAKE_* env vars not set; run infra/snowflake_setup.sql first")
     eng = make_engine(settings)
     if not ping(eng):
         pytest.skip("no Snowflake account reachable with the configured SNOWFLAKE_* env vars")
@@ -94,7 +94,7 @@ def test_observations_vintage_upsert_handles_revisions(engine):
         load_observations_vintage(engine, first_pull)
 
         # second pull: FRED published a revision. The old vintage's realtime_end closes,
-        # and a new vintage row appears — this is exactly what a later `dbt build` needs
+        # and a new vintage row appears: this is exactly what a later `dbt build` needs
         # for point-in-time correctness (Phase 4).
         second_pull = [
             {
@@ -130,8 +130,8 @@ def test_observations_vintage_upsert_handles_revisions(engine):
 def test_observations_current_upsert_survives_a_day_change(engine):
     """Regression test for a real bug: FRED stamps every row in a non-vintage (current-value)
     pull with realtime_start=realtime_end=today, uniformly. A tomorrow-run pull re-stamps every
-    row with a *different* today. Merging on (series_id, obs_date, realtime_start) — like the
-    genuinely-vintage-tracked loader does — would treat that as 16,000+ brand-new rows every
+    row with a *different* today. Merging on (series_id, obs_date, realtime_start), like the
+    genuinely-vintage-tracked loader does, would treat that as 16,000+ brand-new rows every
     single day instead of an update. load_observations_current merges on (series_id, obs_date)
     alone specifically to avoid this; this test simulates the day change directly."""
     from db_snowflake import init_schema, load_observations_current, read_observations

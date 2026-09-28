@@ -3,10 +3,10 @@
 These seeds are the DuckDB target's stand-in for Snowflake RAW: dbt-duckdb can't run the
 production Python ingest pipeline itself, so `dbt seed --target duckdb` loads this snapshot
 into the same `raw` schema/table names the `raw_fred` source expects (see
-dbt/models/staging/_sources.yml) — the staging models don't know or care whether their source
+dbt/models/staging/_sources.yml): the staging models don't know or care whether their source
 data came from a live Snowflake table or a seeded CSV.
 
-Deliberately trimmed to the last ~4 years (via FRED's observation_start), not full history —
+Deliberately trimmed to the last ~4 years (via FRED's observation_start), not full history:
 this is a demo/dev fixture meant to be small enough to commit to git and load in under a
 second, not a production data dump. The real pipeline (ingest/pipeline_snowflake.py) has no
 such limit and pulls each series' full history when it runs against a live Snowflake account.
@@ -33,7 +33,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("generate_dbt_seeds")
 
 SEED_OBSERVATION_START = (
-    "2022-08-05"  # ~4 years back — plenty to show real revisions, small enough to commit
+    "2022-08-05"  # ~4 years back: plenty to show real revisions, small enough to commit
 )
 SEEDS_DIR = Path(__file__).resolve().parent.parent / "dbt" / "seeds"
 
@@ -91,7 +91,7 @@ def main() -> None:
     SEEDS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Filenames must match the table names _sources.yml declares (series_metadata,
-    # observations) — dbt seed names tables after the CSV filename, and the `raw` schema
+    # observations): dbt seed names tables after the CSV filename, and the `raw` schema
     # (dbt_project.yml's seeds config) is what already signals "this is RAW", so no redundant
     # raw_ prefix on the table name itself.
     meta_path = SEEDS_DIR / "series_metadata.csv"

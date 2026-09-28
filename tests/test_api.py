@@ -21,7 +21,7 @@ pytestmark = pytest.mark.api
 def client():
     settings = load_api_settings()
     if not ping(settings):
-        pytest.skip("no bridge.duckdb build found — run `make dbt-build` first")
+        pytest.skip("no bridge.duckdb build found; run `make dbt-build` first")
     return TestClient(app)
 
 

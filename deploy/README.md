@@ -1,10 +1,10 @@
-# deploy/ — Continuous delivery + schedule (M5)
+# deploy/: Continuous delivery + schedule (M5)
 
 On every merge to `main`, CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):
 
-1. **build-and-push** — builds the image and pushes it to GHCR
+1. **build-and-push**: builds the image and pushes it to GHCR
    (`ghcr.io/<owner>/bridge-pipeline:latest` + `:<sha>`).
-2. **deploy** — over SSH to the VPS:
+2. **deploy** (over SSH to the VPS):
    - copies [`docker-compose.prod.yml`](docker-compose.prod.yml),
      [`remote-deploy.sh`](remote-deploy.sh), [`bridge-pipeline.cron`](bridge-pipeline.cron),
      and a rendered `.env` to the box,
@@ -70,7 +70,7 @@ tail -n 40 /opt/bridge/pipeline.log    # cron run output
 ## Monitoring + backup (M6)
 
 **Uptime Kuma** runs as a container in `docker-compose.prod.yml`, bound to
-`127.0.0.1:3001` only — never exposed to the internet. Reach its dashboard via
+`127.0.0.1:3001` only, never exposed to the internet. Reach its dashboard via
 an SSH tunnel:
 
 ```bash
@@ -80,14 +80,14 @@ ssh -L 3001:localhost:3001 deploy@<ip>
 
 One-time setup (Kuma has no config API, so this is done by hand in the UI):
 
-1. First visit creates the admin account — choose your own username/password.
+1. First visit creates the admin account; choose your own username/password.
 2. Add a **Postgres** monitor: hostname `db`, port `5432`, database `bridge`,
-   user `bridge` (password from the `POSTGRES_PASSWORD` secret) — polls the
+   user `bridge` (password from the `POSTGRES_PASSWORD` secret); it polls the
    warehouse directly.
 3. Add a **Push** monitor (type "Push"), heartbeat interval ~26h (a bit more
    than the 24h cron cycle, so a single late run doesn't false-alarm). Copy the
    push URL it generates.
-4. `gh secret set UPTIME_KUMA_PUSH_URL --body '<the push URL>'` — the next
+4. `gh secret set UPTIME_KUMA_PUSH_URL --body '<the push URL>'`; the next
    deploy (or the next `run-pipeline.sh` cron run) starts pinging it. Until
    this secret exists, `run-pipeline.sh` silently skips the ping.
 

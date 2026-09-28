@@ -18,7 +18,7 @@ def engine():
     settings = load_settings()
     eng = make_engine(settings)
     if not ping(eng):
-        pytest.skip("no Postgres reachable — set POSTGRES_* env and start the warehouse")
+        pytest.skip("no Postgres reachable; set POSTGRES_* env and start the warehouse")
     return eng
 
 

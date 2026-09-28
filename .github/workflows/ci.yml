@@ -55,7 +55,7 @@ jobs:
         run: dbt deps --project-dir dbt --profiles-dir dbt
 
       - name: Lint (sqlfluff)
-        # dbt/.sqlfluff pins target: duckdb, so this needs no Snowflake credentials — it
+        # dbt/.sqlfluff pins target: duckdb, so this needs no Snowflake credentials; it
         # only compiles Jinja to check SQL style, doesn't touch real data.
         run: |
           cd dbt
@@ -162,7 +162,7 @@ jobs:
   publish-docs:
     # dbt docs, built against the duckdb target (self-contained, no Snowflake credentials
     # needed just to generate documentation HTML) and published to GitHub Pages. Only on
-    # merge to main — a PR's docs aren't the canonical published set.
+    # merge to main: a PR's docs aren't the canonical published set.
     needs: lint-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -186,7 +186,7 @@ jobs:
       - name: dbt deps
         run: dbt deps --project-dir dbt --profiles-dir dbt
 
-      - name: Seed + build (duckdb — self-contained, just to populate docs' catalog metadata)
+      - name: Seed + build (duckdb; self-contained, just to populate docs' catalog metadata)
         run: |
           dbt seed --project-dir dbt --profiles-dir dbt --target duckdb
           dbt build --project-dir dbt --profiles-dir dbt --target duckdb
@@ -236,7 +236,7 @@ jobs:
   deploy:
     # Continuous delivery: push the new image to the live VPS over SSH.
     # Opt-in: stays skipped (main green) until you set repo variable
-    # DEPLOY_ENABLED=true — do that after M4 is applied and the secrets are set:
+    # DEPLOY_ENABLED=true: do that after M4 is applied and the secrets are set:
     #   gh variable set DEPLOY_ENABLED --body true
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'

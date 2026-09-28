@@ -1,7 +1,7 @@
 """Transform raw FRED rows into clean, typed, deduplicated observations.
 
 Pure function: no I/O, no globals. Raw string rows in, typed rows out. This is
-where the data-fluency shows — the rules for what counts as a valid observation.
+where the data-fluency shows: the rules for what counts as a valid observation.
 """
 
 from __future__ import annotations

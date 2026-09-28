@@ -12,7 +12,7 @@ how-to-run for local dev.
   brew install colima docker docker-compose qemu
   colima start --vm-type qemu
   ```
-- **Python 3.11+** (this repo is developed on 3.13) — only needed for the
+- **Python 3.11+** (this repo is developed on 3.13): only needed for the
   local test/dev loop below, not to run the pipeline.
 
 ## Run the whole thing with Docker (preferred)
@@ -57,7 +57,7 @@ https://fred.stlouisfed.org/docs/api/api_key.html
 
 ```bash
 make db-up      # start the Postgres container + SSH tunnel (see note below)
-make test       # pytest — unit tests always run; integration runs if the DB is up
+make test       # pytest: unit tests always run; integration runs if the DB is up
 make run        # ingest DGS10 from FRED -> raw table -> transform -> clean table
 ```
 
@@ -79,7 +79,7 @@ docker exec bridge-pg psql -U bridge -d bridge \
 
 Note: this repo is private on the Free plan, where GitHub does not allow a
 required-check rule to *hard-block* the merge button (that needs GitHub Pro or a
-public repo). The red check is therefore advisory — CI still catches the failure
+public repo). The red check is therefore advisory: CI still catches the failure
 and marks the PR failing; making the repo public would enable enforced blocking.
 
 ## Note on the DB tunnel (this machine only)

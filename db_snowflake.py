@@ -1,30 +1,30 @@
 """Snowflake RAW-layer access: schema, idempotent loads.
 
 Mirrors db.py's shape deliberately (SQLAlchemy Core, explicit DDL, idempotent loads) so the two
-warehouses are easy to compare while both are live — see AUDIT.md and CONVENTIONS.md's rule against
+warehouses are easy to compare while both are live; see AUDIT.md and CONVENTIONS.md's rule against
 deleting the Postgres path in one pass.
 
 Everything here lands in RAW, verbatim: obs_date/value/realtime_start/realtime_end all stay
-VARCHAR, exactly as FRED/ALFRED returned them — including FRED's "." missing-value marker.
+VARCHAR, exactly as FRED/ALFRED returned them, including FRED's "." missing-value marker.
 Casting and cleaning are staging's job (Phase 3), not this module's. This is a stricter reading
 of "raw means raw" than the legacy Postgres raw_observations table (which casts obs_date to a
-native DATE) — see DECISIONS.md's Phase 2 entry.
+native DATE); see DECISIONS.md's Phase 2 entry.
 
 Idempotency strategy: two loaders, because "vintage" means something different depending on
 whether ingest/series.py's vintage_tracked flag is True or False for a given series.
 
 - load_observations_vintage: for vintage_tracked=True series, keyed on
   (series_id, obs_date, realtime_start). ALFRED vintage data means a single observation date
-  can have many rows — one per real revision — and realtime_start is immutable per vintage
+  can have many rows (one per real revision) and realtime_start is immutable per vintage
   once published; realtime_end is the one field that legitimately changes on a later pull (it
   closes off when a newer vintage supersedes it).
-- load_observations_current: for vintage_tracked=False series (the daily market-rate ones —
+- load_observations_current: for vintage_tracked=False series (the daily market-rate ones;
   see DECISIONS.md's Phase 2 entry), keyed on (series_id, obs_date) alone. These are fetched
   without a wide realtime window, so FRED stamps every row with realtime_start=realtime_end=
-  "today" — a fixed value for the whole pull, not tied to any real revision. Merging on the
+  "today": a fixed value for the whole pull, not tied to any real revision. Merging on the
   3-column key here would be a bug: tomorrow's pull re-stamps every row with tomorrow's date,
   which wouldn't match today's rows, so the pipeline would insert a full duplicate batch every
-  day instead of updating the "latest known value" in place. (Found this the hard way — see
+  day instead of updating the "latest known value" in place. (Found this the hard way; see
   DECISIONS.md.) realtime_start/realtime_end are still stored, just as "last checked on" info,
   not as part of the row's identity.
 """
@@ -67,7 +67,7 @@ def make_engine(settings: SnowflakeSettings) -> Engine:
 
 
 def ping(engine: Engine) -> bool:
-    """True if the warehouse is reachable — used to skip integration tests."""
+    """True if the warehouse is reachable: used to skip integration tests."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -189,7 +189,7 @@ def load_observations_vintage(engine: Engine, rows: list[dict]) -> int:
 
 
 def load_observations_current(engine: Engine, rows: list[dict]) -> int:
-    """Upsert current-value-only observations, keyed on (series_id, obs_date) alone — see the
+    """Upsert current-value-only observations, keyed on (series_id, obs_date) alone; see the
     module docstring for why this needs a different key than load_observations_vintage.
     Returns the number of rows sent."""
     if not rows:

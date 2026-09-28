@@ -29,9 +29,9 @@ models:
       - name: category
         description: >
           CRE-relevant classification this project assigns (rates, inflation, labor, property,
-          credit_conditions) — from the dim_series_category seed, not a FRED field. Deliberately
+          credit_conditions): from the dim_series_category seed, not a FRED field. Deliberately
           a separate scheme from ingest/series.py's `group`, which classifies for ingestion
-          strategy (vintage-tracked or not), a different axis — see DECISIONS.md.
+          strategy (vintage-tracked or not), a different axis; see DECISIONS.md.
         tests:
           - accepted_values:
               arguments:
@@ -61,7 +61,7 @@ models:
       - name: day_of_week
         description: 0 = Sunday through 6 = Saturday.
       - name: fiscal_year
-        description: Equal to `year` — no fiscal-year convention was specified for this domain, so fiscal follows calendar. See DECISIONS.md.
+        description: Equal to `year`; no fiscal-year convention was specified for this domain, so fiscal follows calendar. See DECISIONS.md.
       - name: fiscal_quarter
         description: Equal to `quarter`, same reasoning as fiscal_year.
       - name: is_month_end
@@ -69,12 +69,12 @@ models:
       - name: is_quarter_end
         description: True if this date is the last day of its calendar quarter.
       - name: is_business_day
-        description: True Monday-Friday. Does not account for federal holidays — see DECISIONS.md.
+        description: True Monday-Friday. Does not account for federal holidays; see DECISIONS.md.
 
   - name: fct_observations
     description: >
       The base observation fact, full ALFRED revision history. Grain: one row per series, per
-      observation date, per vintage — (series_key, date_key, realtime_start_date). Every
+      observation date, per vintage: (series_key, date_key, realtime_start_date). Every
       revision is its own row; nothing is collapsed. fct_observations_latest and
       fct_observations_point_in_time are both derived views over this table, not separate
       ingests.
@@ -105,11 +105,11 @@ models:
       - name: realtime_start_date
         description: >
           First date this specific vintage of the value was known to be current. Part of the
-          grain — immutable per vintage once published (see DECISIONS.md's Phase 2 entry).
+          grain, and immutable per vintage once published (see DECISIONS.md's Phase 2 entry).
         tests:
           - not_null
       - name: realtime_end_date
-        description: Last date this vintage was current, or 9999-12-31 if still current (true vintage-tracked series) or the pull date (current-value-only series — see DECISIONS.md).
+        description: Last date this vintage was current, or 9999-12-31 if still current (true vintage-tracked series) or the pull date (current-value-only series; see DECISIONS.md).
         tests:
           - not_null
       - name: value
@@ -119,7 +119,7 @@ models:
 
   - name: fct_observations_latest
     description: >
-      Grain: one row per series, per observation date — the single most recently known vintage
+      Grain: one row per series, per observation date; the single most recently known vintage
       per (series_key, date_key). "Today's best-known view of history." See
       fct_observations_point_in_time for "what was known as of an arbitrary past date" instead.
     tests:
@@ -157,7 +157,7 @@ models:
   - name: fct_observations_point_in_time
     description: >
       Grain: one row per series, per observation date, as known on the as_of_date this model
-      was built with (dbt var `as_of_date`, defaults to today — see the model file). A view,
+      was built with (dbt var `as_of_date`, defaults to today; see the model file). A view,
       not a table, because its answer is only valid for the as_of_date it was last built with.
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -195,7 +195,7 @@ models:
     description: >
       The headline consumption table: one row per calendar month, combining the Treasury
       curve, inflation, labor, commercial property prices, and bank lending standards, plus
-      derived measures. Built from fct_observations_latest — "what do we know now", not a
+      derived measures. Built from fct_observations_latest: "what do we know now", not a
       point-in-time snapshot. Starts 2015-01; see DECISIONS.md for range, forward-fill, and
       derived-measure rationale (especially the z-score window).
     columns:
@@ -229,7 +229,7 @@ models:
         description: DGS30, month-end snapshot.
         tests: *rate_range
       - name: sofr_pct
-        description: SOFR, month-end snapshot. Null before 2018-04 (series doesn't exist yet) — expected.
+        description: SOFR, month-end snapshot. Null before 2018-04 (series doesn't exist yet); expected.
         tests: *rate_range
       - name: cpi_index
         description: CPIAUCSL, the month's own published reading.
@@ -312,7 +312,7 @@ models:
               config:
                 severity: warn
       - name: cpi_yoy_pct
-        description: 12-month percent change in cpi_index — the standard headline inflation rate. Null for the first 12 months of the mart's history (no prior-year value to compare against).
+        description: 12-month percent change in cpi_index; the standard headline inflation rate. Null for the first 12 months of the mart's history (no prior-year value to compare against).
         tests: &yoy_inflation_range
           - dbt_expectations.expect_column_values_to_be_between:
               arguments:
@@ -345,7 +345,7 @@ models:
                 severity: warn
       - name: real_10y_rate_pct
         description: >
-          treasury_10y_pct minus cpi_yoy_pct — a realized-inflation proxy for the real 10-year
+          treasury_10y_pct minus cpi_yoy_pct: a realized-inflation proxy for the real 10-year
           rate, not a TIPS-based real yield (no TIPS series in the catalog). See DECISIONS.md.
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
@@ -357,7 +357,7 @@ models:
       - name: treasury_10y_2y_spread_zscore_60mo
         description: >
           Z-score of treasury_10y_2y_spread_pct against its own trailing 60-month mean/stddev.
-          Null until 60 months of mart history accumulate — on the duckdb target (seed trimmed
+          Null until 60 months of mart history accumulate; on the duckdb target (seed trimmed
           to ~4 years) this column is null for the entire fixture, which is expected, not a
           bug. See DECISIONS.md for why 60 months and why this measure specifically.
         tests:

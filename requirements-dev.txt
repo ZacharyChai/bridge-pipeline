@@ -2,7 +2,7 @@
 pytest>=8.0
 ruff>=0.5
 
-# SQL lint (Snowflake dialect — see .sqlfluff). Enforced from the first phase with real SQL
+# SQL lint (Snowflake dialect; see .sqlfluff). Enforced from the first phase with real SQL
 # models (Phase 3), not deferred to Phase 6's CI wiring.
 sqlfluff>=3.0
 sqlfluff-templater-dbt>=3.0

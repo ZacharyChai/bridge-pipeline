@@ -47,7 +47,7 @@ def load_settings() -> Settings:
 class SnowflakeSettings:
     """Connection settings for the Phase 2 Snowflake RAW loader. Separate from Settings
     (above) rather than folded in, since the two warehouses are unrelated connections that
-    happen to coexist during the Postgres-to-Snowflake migration — see AUDIT.md."""
+    happen to coexist during the Postgres-to-Snowflake migration; see AUDIT.md."""
 
     fred_api_key: str
     account: str
@@ -76,7 +76,7 @@ class SnowflakeSettings:
 def load_snowflake_settings() -> SnowflakeSettings:
     """Load .env (if present) then read Snowflake settings from the environment.
 
-    Reuses the same SNOWFLAKE_* variables dbt's profiles.yml reads (see dbt/profiles.yml) —
+    Reuses the same SNOWFLAKE_* variables dbt's profiles.yml reads (see dbt/profiles.yml):
     one set of credentials, two tools connecting to the same account.
     """
     load_dotenv()

@@ -1,4 +1,4 @@
-# infra/ — Terraform (GCP)
+# infra/: Terraform (GCP)
 
 Provisions a hardened Debian VM on Google Compute Engine with SSH-only ingress,
 and bootstraps it (non-root user, key-only SSH, `ufw`, Docker) via
@@ -32,7 +32,7 @@ and bootstraps it (non-root user, key-only SSH, `ufw`, Docker) via
 cd infra
 cp terraform.tfvars.example terraform.tfvars   # set project_id + ssh_source_ranges (YOUR_IP/32)
 terraform init
-terraform plan       # review — no changes made yet
+terraform plan       # review: no changes made yet
 terraform apply      # creates the box (~$13/mo for e2-small; e2-micro is Always-Free)
 ```
 
